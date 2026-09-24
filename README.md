@@ -61,7 +61,7 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 > **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
 
-**Harness (about a minute, no Docker):**
+**Harness (no Docker):**
 
 ```bash
 pip install -e "harness[dev]"
