@@ -17,7 +17,7 @@ flowchart LR
 |---|---|---|
 | Zone logic lives in `harness/replay`, imported by the edge service | One implementation, tested offline, deployed unchanged | Edge image build context is the repo root |
 | Footpoint anchor by default | Ground contact is stable under shadows and tall vehicles | Wrong for overhead cameras, where centroid is better |
-| Enter event held until the visit closes | Short visits emit nothing, so downstream never has to retract | Enter events arrive together with the exit, up to a whole visit late |
+| Enter event held until the visit closes | Short visits emit nothing, so downstream never has to retract | Enter events arrive with the exit: a whole visit late, plus `lost_ms` when the track was lost |
 | Edge reaches the broker only through Toxiproxy | Every network scenario is a one-line, scriptable change | TCP-level only |
 | ULID event IDs + idempotent insert | At-least-once delivery becomes effectively exactly-once | Requires a unique index on the hot table |
 | Retained status + last-will | Portal can tell "unreachable" from "reachable but not processing frames" | Slightly more broker state |
