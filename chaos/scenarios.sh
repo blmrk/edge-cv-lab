@@ -8,7 +8,8 @@ reset() { for t in $(curl -fsS "$API/proxies/mqtt/toxics" | grep -o '"name":"[^"
 case "${1:-}" in
   64k|128k|256k|512k) reset; kbps=${1%k}  # toxiproxy bandwidth rate is KB/s
     toxic "{\"type\":\"bandwidth\",\"stream\":\"upstream\",\"attributes\":{\"rate\":$((kbps/8))}}" ;;
-  latency) reset; toxic '{"type":"latency","attributes":{"latency":400,"jitter":150}}' ;;
+  latency) reset; for s in upstream downstream; do  # toxiproxy defaults to downstream only: events would pass undelayed
+             toxic "{\"type\":\"latency\",\"stream\":\"$s\",\"attributes\":{\"latency\":400,\"jitter\":150}}"; done ;;
   outage)  curl -fsS -X POST "$API/proxies/mqtt" -d '{"enabled":false}' >/dev/null; sleep "${2:-60}"
            curl -fsS -X POST "$API/proxies/mqtt" -d '{"enabled":true}'  >/dev/null ;;
   reset)   reset ;;

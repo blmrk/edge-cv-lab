@@ -59,7 +59,7 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 ## Quick start
 
-> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. The chaos scenarios have been run: through a 2 minute outage, 10 seeded scenes delivered every event exactly once. Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. The chaos scenarios have been run: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, 29 seeded scenes delivered every event exactly once (median lag 0.67 s under latency, ~2 min after the outage). Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
 
 **Harness (about a minute, no Docker):**
 
