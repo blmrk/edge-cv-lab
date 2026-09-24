@@ -6,5 +6,6 @@ media/*
 harness/zone.json
 harness/truth.json
 !media/README.md
+!media/SOURCES.md
 *.pt
 .env
