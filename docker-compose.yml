@@ -7,6 +7,7 @@ services:
     profiles: [video]
     image: bluenviron/mediamtx:latest
     ports: ["8554:8554"]
+    restart: unless-stopped
 
   camera:  # loops ./media/sample.mp4 forever as rtsp://mediamtx:8554/cam1
     image: linuxserver/ffmpeg:latest
@@ -26,6 +27,7 @@ services:
       test: ["CMD", "emqx", "ctl", "status"]
       interval: 5s
       retries: 20
+    restart: unless-stopped  # every service: after a Docker restart the lab comes back whole, not half-up
 
   toxiproxy:  # the "cellular uplink": edge talks to the broker only through here
     image: ghcr.io/shopify/toxiproxy:2.9.0
@@ -33,11 +35,13 @@ services:
     ports: ["8474:8474"]
     volumes: ["./chaos/toxiproxy.json:/config/toxiproxy.json:ro"]
     command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
     environment: { POSTGRES_PASSWORD: lab, POSTGRES_DB: lab }
     ports: ["5432:5432"]
+    restart: unless-stopped
 
   ingest:
     build: ./services/ingest
@@ -70,6 +74,7 @@ services:
   grafana:
     image: grafana/grafana-oss:11.2.0
     depends_on: [postgres]
+    restart: unless-stopped
     ports: ["3000:3000"]
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
