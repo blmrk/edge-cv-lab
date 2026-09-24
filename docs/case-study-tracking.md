@@ -10,7 +10,7 @@ Zone-based vehicle analytics report inflated visit counts and wrong dwell times.
 
 - Footage: `TBD` (source, licence, duration, resolution, camera angle)
 - Ground truth: `TBD` visits, labelled with `tools/label.html` at 2x, `TBD` passes. Logged in `media/SOURCES.md`.
-- Tracks: `dump_tracks.py` with `yolov8n`, run once per tracker and committed under `harness/runs/`
+- Tracks: `dump_tracks.py` with `yolov8n`, run once per tracker and saved under `harness/runs/` (gitignored; the Reproduce commands below regenerate them)
 - Zone: polygon in `TBD.json`, screenshot below
 
 ## Baseline
