@@ -1,4 +1,4 @@
-.PHONY: test fixtures visuals trackers up up-video down logs counts
+.PHONY: test fixtures visuals trackers up up-video down logs counts delivery drill
 ALL = --profile sim --profile video
 Z = fixtures/zone.json
 T = fixtures/traffic.jsonl
@@ -26,3 +26,5 @@ up-video:  ; docker compose --profile video up -d --build   # needs media/sample
 down:      ; docker compose $(ALL) down -v
 logs:      ; docker compose $(ALL) logs -f sim edge ingest
 counts:    ; docker compose exec postgres psql -U postgres lab -c "select counter, kind, count(*) from zone_events group by 1,2 order by 1,2"
+delivery:  ; cd harness && python scripts/check_delivery.py   # every completed sim scene stored exactly once?
+drill:     ; chaos/drill.sh                                  # ~9 min: 64k, latency, outage, then delivery + lag

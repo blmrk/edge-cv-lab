@@ -59,7 +59,7 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 ## Quick start
 
-> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. The chaos scenarios have been run: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, 29 seeded scenes delivered every event exactly once (median lag 0.67 s under latency, ~2 min after the outage). Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
 
 **Harness (about a minute, no Docker):**
 
@@ -102,7 +102,8 @@ python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth tr
 chaos/scenarios.sh 64k        # 64 kbps uplink
 chaos/scenarios.sh outage 120 # 2 minute disconnect
 chaos/scenarios.sh reset
-make counts                   # did every event still arrive, exactly once?
+make delivery                 # did every event arrive exactly once? each finished scene vs its offline replay
+make drill                    # all of it on a fresh lab, ~9 min, with a delivery-lag table per phase
 # Grafana: events flatline, then a catch-up spike with high delivery lag
 ```
 
