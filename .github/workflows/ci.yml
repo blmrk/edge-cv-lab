@@ -11,3 +11,7 @@ jobs:
       - run: make fixtures && git diff --exit-code harness/fixtures  # fixtures must be reproducible
       - run: make test
       - run: docker compose --profile sim --profile video config -q
+      - run: docker compose --profile sim build
+      # import-only smoke: a clean build can still ship a missing runtime dep (python-ulid 4.x -> typing_extensions)
+      - run: for s in sim ingest; do docker compose run --rm --no-deps $s python -c "import main"; done
+      # ponytail: edge image skipped (multi-GB torch build), same check applies if it ever gets its own job
