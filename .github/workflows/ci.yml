@@ -14,4 +14,4 @@ jobs:
       - run: docker compose --profile sim build
       # import-only smoke: a clean build can still ship a missing runtime dep (python-ulid 4.x -> typing_extensions)
       - run: for s in sim ingest; do docker compose run --rm --no-deps $s python -c "import main"; done
-      # ponytail: edge image skipped (multi-GB torch build), same check applies if it ever gets its own job
+      # edge image skipped: slow torch + ultralytics build. The same import check applies if it gets its own job
