@@ -2,3 +2,4 @@ ultralytics>=8.3
 opencv-python-headless
 paho-mqtt>=2.0
 python-ulid>=2.7
+typing_extensions  # python-ulid 4.x imports it on py<3.12 without declaring it

@@ -41,7 +41,7 @@ services:
 
   ingest:
     build: ./services/ingest
-    depends_on: [postgres, emqx]
+    depends_on: { postgres: { condition: service_started }, emqx: { condition: service_healthy } }
     environment:
       DATABASE_URL: postgresql://postgres:lab@postgres:5432/lab
       MQTT_HOST: emqx
