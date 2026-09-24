@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Literal
 
-from .geometry import Polygon, point_in_polygon
+from .geometry import Polygon, distance_to_edge, point_in_polygon
 from .schema import TrackBox
 
 Anchor = Literal["centroid", "footpoint"]
@@ -58,6 +58,10 @@ class DebouncedZoneCounter:
 
     - enter_frames / exit_frames: the anchor must sit on the other side for N consecutive
       frames before the state commits. Kills boundary jitter.
+    - margin_px: the anchor must also be at least this far past the edge for a frame to count
+      towards the other side. Frame counts alone cannot stop a vehicle parked on the edge: its
+      jitter lands each side about half the time, so a long enough idle eventually yields both
+      runs and a phantom visit. Set it above the footpoint jitter of a parked vehicle.
     - min_dwell_ms: a visit shorter than this is discarded entirely (enter and exit both dropped).
     - cooldown_ms: after an exit, the same track cannot re-enter for this long.
     - lost_ms: a track that vanishes while inside (tracker dropped it, ID changed, object occluded)
@@ -76,8 +80,9 @@ class DebouncedZoneCounter:
         min_dwell_ms: int = 1000,
         cooldown_ms: int = 1500,
         lost_ms: int = 3000,
+        margin_px: float = 10,
     ):
-        self.polygon, self.anchor = polygon, anchor
+        self.polygon, self.anchor, self.margin_px = polygon, anchor, margin_px
         self.enter_frames, self.exit_frames = enter_frames, exit_frames
         self.min_dwell_ms, self.cooldown_ms, self.lost_ms = min_dwell_ms, cooldown_ms, lost_ms
         self._s: dict[int, _State] = {}
@@ -106,7 +111,10 @@ class DebouncedZoneCounter:
     def _update(self, box: TrackBox) -> list[ZoneEvent]:
         s = self._s.setdefault(box.track_id, _State())
         s.last_ts, s.last_frame = box.ts_ms, box.frame
-        now = point_in_polygon(_anchor(box, self.anchor), self.polygon)
+        pt = _anchor(box, self.anchor)
+        now = point_in_polygon(pt, self.polygon)
+        if now != s.inside and distance_to_edge(pt, self.polygon) < self.margin_px:
+            now = s.inside  # too close to the edge to count as evidence for the other side
 
         if now == s.inside:
             s.streak = 0
