@@ -45,7 +45,7 @@ One synthetic car idles on a zone boundary for 10 seconds with ±6 px box jitter
 
 Reproduce: `cd harness && python -m replay.cli --tracks fixtures/boundary_jitter.jsonl --zone fixtures/zone.json --expected 1`
 
-The same 24-vehicle synthetic scene (ground truth 17 visits) gives 206 naive vs 17 debounced. Lane B never enters the zone, yet shadow-stretched boxes make the naive counter log visits there:
+The same 24-vehicle synthetic scene (ground truth 17 visits) gives 205 naive vs 17 debounced (`cd harness && python -m replay.cli --tracks fixtures/traffic.jsonl --zone fixtures/zone.json --expected 17`). Lane B never enters the zone, yet shadow-stretched boxes make the naive counter log visits there:
 
 ![per-track timeline](docs/img/timeline.png)
 
