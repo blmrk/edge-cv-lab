@@ -62,6 +62,9 @@ class DebouncedZoneCounter:
       towards the other side. Frame counts alone cannot stop a vehicle parked on the edge: its
       jitter lands each side about half the time, so a long enough idle eventually yields both
       runs and a phantom visit. Set it above the footpoint jitter of a parked vehicle.
+      Trade-off: a vehicle that stops closer than margin_px to an edge never flips state (a stop just
+      inside is not counted, a wait just outside keeps the visit open), and a zone must be wider than
+      2 * margin_px to count anything. Keep stopping areas clear of the zone's edges.
     - min_dwell_ms: a visit shorter than this is discarded entirely (enter and exit both dropped).
     - cooldown_ms: after an exit, the same track cannot re-enter for this long.
     - lost_ms: a track that vanishes while inside (tracker dropped it, ID changed, object occluded)
