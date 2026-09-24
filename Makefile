@@ -4,7 +4,7 @@ Z = fixtures/zone.json
 T = fixtures/traffic.jsonl
 test:      ; cd harness && python -m pytest -q
 fixtures:  ; cd harness && python scripts/make_fixtures.py
-visuals:   ## regenerate every image in docs/img from the fixtures
+visuals:   ## regenerate the fixture images in docs/img (make trackers makes trackers.gif and spacetime.png)
 	cd harness && python -m replay.viz compare --tracks $(T) --zone $(Z) --out ../docs/img/compare.gif --seconds 18 \
 	 && python -m replay.viz heatmap --tracks $(T) --zone $(Z) --out ../docs/img/heatmap.png \
 	 && python -m replay.viz trajectories --tracks $(T) --zone $(Z) --out ../docs/img/trajectories.png \

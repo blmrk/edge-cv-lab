@@ -53,7 +53,7 @@ The 24-vehicle traffic fixture (ground truth 17 visits) gives 205 naive vs 17 de
 |---|---|
 | ![heatmap](docs/img/heatmap.png) | ![trajectories](docs/img/trajectories.png) |
 
-Every image is generated from checked-in fixtures: `pip install -e "harness[viz]" && make visuals`. Add `--video clip.mp4` to draw over a real frame instead of the schematic road.
+Every image in `docs/img` is generated from checked-in fixtures: `pip install -e "harness[viz]" && make visuals && make trackers`. Add `--video clip.mp4` to draw over a real frame instead of the schematic road.
 
 Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-tracking.md).
 
