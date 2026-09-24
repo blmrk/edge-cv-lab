@@ -27,7 +27,7 @@ Coloured boxes are what each tracker reports. Watch the dwell timer in the middl
 ![space-time diagram](img/spacetime.png)
 
 Reading it: with a 3 s buffer the first car's track stays parked at the window after it leaves, and
-every following car inherits that ID (the long orange line). Six customers become one 45-second visit.
+every following car inherits that ID (the long orange line). Six customers become one long visit.
 Shortening the buffer fixes the count but shatters each car into three IDs, so queue-to-exit time can
 no longer be measured. It also only works because the zone counter closes a visit when its track goes
 silent for 3 s (`lost_ms`). Without that timeout those visits would stay open forever. Associating on the ground contact point with a lane-shaped gate gets both right.
