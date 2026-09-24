@@ -1,7 +1,8 @@
 """Did every sim event reach Postgres exactly once, and how late? Needs the lab running (`make up`).
 
-Every completed scene (the sim publishes its ground truth when a seed ends) is compared with an offline
-replay of the same seed. Exits 1 on any lost, extra or duplicated event.
+Every finished scene is compared with an offline replay of the same seed. A scene has finished when its
+ground truth arrives (the sim publishes it as each seed ends) or a later seed has events. Exits 1 on any
+lost, extra or duplicated event, or a finished scene whose ground truth never arrived.
 
     python scripts/check_delivery.py [--window NAME START END ...]    # START/END: ISO-8601 UTC
 """
@@ -15,7 +16,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from replay.delivery import expected_events, reconcile
+from replay.delivery import expected_events, finished_seeds, reconcile
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -41,23 +42,24 @@ def main():
         sys.exit(f"bad --device {a.device!r}")
     dev = f"device_id = '{a.device}'"
 
-    seeds = [int(s) for (s,) in sql(f"SELECT seed FROM ground_truth WHERE {dev} ORDER BY seed")]
+    truth = {int(s) for (s,) in sql(f"SELECT seed FROM ground_truth WHERE {dev}")}
+    rows = sql(f"SELECT track_id / 1000, counter, kind, count(*), count(DISTINCT (track_id, ts_ms)) "
+               f"FROM zone_events WHERE {dev} GROUP BY 1, 2, 3")
+    seeds = finished_seeds(truth, {int(r[0]) for r in rows})
     if not seeds:
-        sys.exit("no completed scenes yet: the sim publishes ground truth at the end of each seed")
-    stored, distinct, seen = Counter(), Counter(), set()
-    for seed, counter, kind, n, d in sql(f"SELECT track_id / 1000, counter, kind, count(*), "
-                                         f"count(DISTINCT (track_id, ts_ms)) FROM zone_events WHERE {dev} GROUP BY 1, 2, 3"):
-        seen.add(int(seed))
+        sys.exit("no finished scenes yet: wait for the first seed to end")
+    stored, distinct = Counter(), Counter()
+    for seed, counter, kind, n, d in rows:
         if int(seed) in seeds:
             stored[(int(seed), counter, kind)] += int(n)
             distinct[(int(seed), counter, kind)] += int(d)
     expected = Counter({(s, c, k): n for s in seeds for (c, k), n in expected_events(s).items()})
     r = reconcile(expected, stored, distinct)
-    no_truth = sorted(s for s in seen - set(seeds) if s < seeds[-1])  # finished scene whose ground truth never arrived
-    print(f"completed scenes: {len(seeds)} (seeds {seeds[0]}-{seeds[-1]}) | events expected {r['expected']} "
+    no_truth = [s for s in seeds if s not in truth]
+    print(f"finished scenes: {len(seeds)} (seeds {seeds[0]}-{seeds[-1]}) | events expected {r['expected']} "
           f"| stored {r['stored']} | lost {r['lost']} | extra {r['extra']} | duplicates {r['duplicates']}")
     if no_truth:
-        print(f"scenes with events but no ground truth (its message was lost): seeds {no_truth}")
+        print(f"finished scenes whose ground truth never arrived: seeds {no_truth}")
     if r["extra"]:
         print("extra events: did the sim restart mid-run? It replays from its first seed. Check on a fresh `make up`.")
 

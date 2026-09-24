@@ -28,3 +28,11 @@ def reconcile(expected: Counter, stored: Counter, distinct: Counter) -> dict:
             "lost": sum(max(expected[k] - distinct[k], 0) for k in keys),
             "extra": sum(max(distinct[k] - expected[k], 0) for k in keys),
             "duplicates": sum(stored[k] - distinct[k] for k in keys)}
+
+
+def finished_seeds(truth: set, seen: set) -> list:
+    """The sim plays seeds in order, so a seed has finished if its ground truth arrived or a later seed has
+    events. Seeds in that range with no rows at all were lost outright and still count as finished."""
+    if not truth and not seen:
+        return []
+    return sorted(truth | set(range(min(truth | seen), max(seen, default=0))))
