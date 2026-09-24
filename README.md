@@ -113,7 +113,7 @@ make counts                   # did every event still arrive, exactly once?
 | Failure | Cause | Fix demonstrated | Fixture |
 |---|---|---|---|
 | Track vanishes inside the zone, visit never ends | Counter only reacts to boxes it receives | `lost_ms` timeout closes the visit at the last-seen time | `queue.dets.jsonl` |
-| Boundary jitter inflates counts | State flips on every frame the anchor crosses the edge | N-frame hysteresis, minimum dwell, cooldown | `boundary_jitter.jsonl` |
+| Boundary jitter inflates counts | State flips on every frame the anchor crosses the edge | N-frame and spatial hysteresis, minimum dwell, cooldown | `boundary_jitter.jsonl` |
 | Shadow pulls box into adjacent lane | Centroid moves when the box stretches | Bottom-centre footpoint anchor | `shadow_expansion.jsonl` |
 | Events lost on disconnect | Fire-and-forget publish | QoS 1, persistent session, bounded local queue | lab + `outage` |
 | Double counting after reconnect | At-least-once redelivery | ULID `event_id` + `ON CONFLICT DO NOTHING` | lab + `outage` |

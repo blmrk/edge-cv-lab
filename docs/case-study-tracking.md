@@ -32,6 +32,7 @@ Add a GIF of the worst offender here. One clip of a box flickering on a boundary
 | Baseline | TBD | |
 | + footpoint anchor | TBD | |
 | + hysteresis (5 in / 8 out) | TBD | |
+| + edge margin (10 px) | TBD | parked on the zone edge |
 | + min dwell 1 s, cooldown 1.5 s | TBD | |
 | + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | TBD | identity handover impact |
 
