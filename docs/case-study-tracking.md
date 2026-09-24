@@ -45,6 +45,9 @@ Report each step separately. An ablation is more convincing than one before/afte
 | Boundary jitter, 10 s | 1 | 66 | 1 |
 | Shadow into adjacent lane | 0 | 1 | 0 |
 
+Reproduce: `cd harness && python -m replay.cli --tracks fixtures/boundary_jitter.jsonl --zone fixtures/zone.json --expected 1`,
+then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
+
 ## What did not work
 
 TBD. Keep this section. Parameters that over-suppressed real short visits, cases where footpoint was worse, and so on.
