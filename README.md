@@ -59,7 +59,7 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 ## Quick start
 
-> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. Not yet run: `make up-video` (edge + YOLO) and the chaos scenarios. `make visuals` and `make trackers` are not run in CI.
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. The chaos scenarios have been run: through a 2 minute outage, 10 seeded scenes delivered every event exactly once. Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
 
 **Harness (about a minute, no Docker):**
 
@@ -105,6 +105,8 @@ chaos/scenarios.sh reset
 make counts                   # did every event still arrive, exactly once?
 # Grafana: events flatline, then a catch-up spike with high delivery lag
 ```
+
+![Grafana through a 2 minute outage: events flatline, then catch up with ~2 min delivery lag](docs/img/grafana-outage.png)
 
 ## Failure modes covered
 
