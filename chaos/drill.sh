@@ -5,7 +5,7 @@
 # outage, so its backlog shows up in the post-outage window.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-s=chaos/scenarios.sh
+s="$PWD/chaos/scenarios.sh"  # absolute: the last step runs from harness/
 trap '$s reset >/dev/null 2>&1 || true' EXIT  # an interrupted drill must not leave the uplink impaired
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 $s reset
