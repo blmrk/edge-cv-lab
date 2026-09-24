@@ -3,7 +3,8 @@
 set -euo pipefail
 API=${TOXIPROXY:-http://localhost:8474}
 toxic() { curl -fsS -X POST "$API/proxies/mqtt/toxics" -H 'Content-Type: application/json' -d "$1" >/dev/null; }
-reset() { for t in $(curl -fsS "$API/proxies/mqtt/toxics" | grep -o '"name":"[^"]*"' | cut -d'"' -f4); do
+reset() { curl -fsS -X POST "$API/proxies/mqtt" -d '{"enabled":true}' >/dev/null  # undo an interrupted outage
+          for t in $(curl -fsS "$API/proxies/mqtt/toxics" | grep -o '"name":"[^"]*"' | cut -d'"' -f4); do
             curl -fsS -X DELETE "$API/proxies/mqtt/toxics/$t" >/dev/null; done; }
 case "${1:-}" in
   64k|128k|256k|512k) reset; kbps=${1%k}  # toxiproxy bandwidth rate is KB/s
