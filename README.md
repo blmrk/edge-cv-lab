@@ -59,6 +59,8 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 ## Quick start
 
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. Not yet run: `make up-video` (edge + YOLO) and the chaos scenarios. `make visuals` and `make trackers` are not run in CI.
+
 **Harness (about a minute, no Docker):**
 
 ```bash
@@ -129,11 +131,11 @@ More in [docs/architecture.md](docs/architecture.md).
 
 ## Limitations
 
-- Synthetic fixtures prove the logic, not real-world accuracy. The case study uses public footage for that.
+- Synthetic fixtures exercise the logic and reproduce specific failure modes; they say nothing about real-world accuracy. The case study uses public footage for that.
 - The edge node runs YOLO on CPU. It models pipeline behaviour, not accelerator (NPU) numerics or latency.
 - Toxiproxy shapes TCP only. It does not model packet loss or radio behaviour of a real cellular link.
-- Synthetic vehicles follow scripted paths with perfect IDs, so they exercise zone logic, not the tracker. Tracker comparisons need real footage.
-- The compose stack has been syntax-validated but tune `mem_limit` and the zone polygon for your clip.
+- The `sim` scene hands the counter perfect track IDs, so it tests zone logic, not tracking. Tracker comparisons run on the queue fixture's raw detections instead.
+- For `make up-video`, tune `mem_limit` and the zone polygon for your clip.
 
 ## Licence
 
