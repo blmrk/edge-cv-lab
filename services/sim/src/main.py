@@ -29,7 +29,7 @@ def main():
     while True:
         boxes, truth = generate_traffic(seed=seed)
         counters = {"naive": NaiveZoneCounter(ZONE, "centroid"), "debounced": DebouncedZoneCounter(ZONE)}
-        t0, last_hb, n = time.monotonic(), 0.0, 0
+        t0, wall0, last_hb, n = time.monotonic(), time.time_ns() // 1_000_000, 0.0, 0
         for frame, bucket in by_frame(boxes):
             delay = t0 + frame / FPS / SPEED - time.monotonic()
             if delay > 0:
@@ -38,9 +38,10 @@ def main():
             for name, counter in counters.items():
                 for b in bucket:
                     for ev in counter.update(b):
+                        # event time, not publish time: debounced enters are held until the visit closes
                         c.publish(f"events/{DEVICE}/zone", json.dumps({
                             "event_id": str(ULID()), "device_id": DEVICE, "counter": name, "kind": ev.kind,
-                            "track_id": seed * 1000 + ev.track_id, "ts_ms": time.time_ns() // 1_000_000}), qos=1)
+                            "track_id": seed * 1000 + ev.track_id, "ts_ms": wall0 + int(ev.ts_ms / SPEED)}), qos=1)
             if time.monotonic() - last_hb > 10:
                 fps = n / (time.monotonic() - last_hb) if last_hb else FPS * SPEED
                 c.publish(f"devices/{DEVICE}/status", json.dumps({"state": "online", "fps": round(fps, 1)}),
