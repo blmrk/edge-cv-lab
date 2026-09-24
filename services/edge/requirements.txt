@@ -1,0 +1,4 @@
+ultralytics>=8.3
+opencv-python-headless
+paho-mqtt>=2.0
+python-ulid>=2.7

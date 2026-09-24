@@ -1,0 +1,13 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e "harness[dev]"
+      - run: make fixtures && git diff --exit-code harness/fixtures  # fixtures must be reproducible
+      - run: make test
+      - run: docker compose --profile sim --profile video config -q

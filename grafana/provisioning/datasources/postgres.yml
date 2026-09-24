@@ -1,0 +1,10 @@
+apiVersion: 1
+datasources:
+  - name: lab-postgres
+    uid: lab-pg
+    type: postgres
+    url: postgres:5432
+    user: postgres
+    isDefault: true
+    secureJsonData: { password: lab }
+    jsonData: { database: lab, sslmode: disable, postgresVersion: 1600 }

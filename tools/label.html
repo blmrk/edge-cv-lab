@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ground truth labeller</title>
+<style>
+  :root { --ink:#1d2430; --paper:#f3f5f7; --rule:#c9d0d8; --zone:#0a7d8c; --in:#1f7a3d; --out:#a8323a; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 15px/1.5 "Segoe UI", "Helvetica Neue", Arial, sans-serif; color:var(--ink); background:var(--paper); }
+  main { max-width: 1180px; margin: 0 auto; padding: 20px; display:grid; grid-template-columns: minmax(0,1fr) 300px; gap:20px; }
+  h1 { font-size: 20px; margin: 0 0 4px; grid-column: 1 / -1; }
+  p.lead { margin:0 0 8px; grid-column: 1 / -1; max-width: 70ch; }
+  #stage { position:relative; background:#000; line-height:0; }
+  video, canvas { width:100%; display:block; }
+  canvas { position:absolute; inset:0; height:100%; cursor: crosshair; }
+  #stage.locked canvas { pointer-events:none; }
+  .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+  button, select, input[type=file] { font: inherit; padding:6px 10px; border:1px solid var(--rule); background:#fff; border-radius:4px; }
+  button:hover { border-color: var(--ink); }
+  kbd { font: 13px ui-monospace, Menlo, Consolas, monospace; border:1px solid var(--rule); border-bottom-width:2px; border-radius:3px; padding:0 5px; background:#fff; }
+  aside h2 { font-size: 15px; margin: 0 0 6px; }
+  aside section { border-top: 1px solid var(--rule); padding: 12px 0; }
+  .tally { font-size: 34px; font-weight: 600; line-height:1.1; }
+  .tally small { font-size: 14px; font-weight: 400; }
+  ol { margin:0; padding-left: 22px; max-height: 260px; overflow:auto; font-variant-numeric: tabular-nums; }
+  li.enter { color: var(--in); } li.exit { color: var(--out); }
+  table { border-collapse: collapse; } td { padding: 2px 10px 2px 0; vertical-align: top; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ground truth labeller</h1>
+  <p class="lead">Load a clip, click the corners of your zone on the first frame, then watch at 2x and tap a key each time a vehicle enters or leaves. Nothing is uploaded. Everything stays in this browser tab.</p>
+
+  <div>
+    <div id="stage"><video id="v" playsinline muted></video><canvas id="c"></canvas></div>
+    <div class="bar">
+      <input type="file" id="file" accept="video/*">
+      <button id="lock">Lock zone</button>
+      <button id="clearZone">Clear zone</button>
+      <label>Speed <select id="rate"><option>0.5</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select></label>
+      <span id="clock">0.0 s</span>
+    </div>
+  </div>
+
+  <aside>
+    <div class="tally"><span id="nEnter">0</span> <small>entered</small> &nbsp; <span id="nExit">0</span> <small>left</small></div>
+    <section>
+      <h2>Keys</h2>
+      <table>
+        <tr><td><kbd>E</kbd></td><td>a vehicle entered the zone</td></tr>
+        <tr><td><kbd>X</kbd></td><td>a vehicle left the zone</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>play / pause</td></tr>
+        <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>jump 2 s</td></tr>
+        <tr><td><kbd>Z</kbd></td><td>undo last mark</td></tr>
+      </table>
+    </section>
+    <section>
+      <h2>Marks</h2>
+      <ol id="log"></ol>
+    </section>
+    <section>
+      <h2>Save</h2>
+      <div class="bar" style="margin:0">
+        <button id="saveZone">zone.json</button>
+        <button id="saveTruth">truth.json</button>
+      </div>
+      <p style="margin:8px 0 0">Judge by where the wheels touch the ground, not the box. Count a vehicle only if it stays at least a second.</p>
+    </section>
+  </aside>
+</main>
+
+<script>
+const v = document.getElementById('v'), c = document.getElementById('c'), ctx = c.getContext('2d');
+const stage = document.getElementById('stage');
+let zone = [], marks = [], locked = false, fileName = 'clip';
+
+document.getElementById('file').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  fileName = f.name; v.src = URL.createObjectURL(f); zone = []; marks = []; setLocked(false); render();
+};
+v.onloadedmetadata = () => { c.width = v.videoWidth; c.height = v.videoHeight; v.playbackRate = +rate.value; draw(); };
+v.ontimeupdate = () => { document.getElementById('clock').textContent = v.currentTime.toFixed(1) + ' s'; };
+const rate = document.getElementById('rate'); rate.onchange = () => v.playbackRate = +rate.value;
+
+c.onclick = e => {                       // zone corners, stored in video pixel coordinates
+  if (locked || !v.videoWidth) return;
+  const r = c.getBoundingClientRect();
+  zone.push([Math.round((e.clientX - r.left) / r.width * v.videoWidth),
+             Math.round((e.clientY - r.top) / r.height * v.videoHeight)]);
+  draw();
+};
+function setLocked(x) { locked = x; stage.classList.toggle('locked', x); document.getElementById('lock').textContent = x ? 'Edit zone' : 'Lock zone'; }
+document.getElementById('lock').onclick = () => { if (zone.length < 3 && !locked) return alert('Click at least 3 corners first.'); setLocked(!locked); };
+document.getElementById('clearZone').onclick = () => { zone = []; setLocked(false); draw(); };
+
+function draw() {
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (!zone.length) return;
+  const css = getComputedStyle(document.documentElement).getPropertyValue('--zone').trim();
+  ctx.lineWidth = Math.max(2, c.width / 400); ctx.strokeStyle = css; ctx.fillStyle = css + '33';
+  ctx.beginPath(); zone.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+  if (zone.length > 2) ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = css; zone.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, ctx.lineWidth * 2.5, 0, 7); ctx.fill(); });
+}
+
+function mark(kind) { marks.push({ kind, ms: Math.round(v.currentTime * 1000) }); marks.sort((a, b) => a.ms - b.ms); render(); }
+function render() {
+  document.getElementById('nEnter').textContent = marks.filter(m => m.kind === 'enter').length;
+  document.getElementById('nExit').textContent = marks.filter(m => m.kind === 'exit').length;
+  const log = document.getElementById('log'); log.innerHTML = '';
+  marks.forEach(m => { const li = document.createElement('li'); li.className = m.kind;
+    li.textContent = (m.ms / 1000).toFixed(1) + ' s  ' + m.kind; log.appendChild(li); });
+  log.scrollTop = log.scrollHeight;
+}
+
+addEventListener('keydown', e => {
+  if (!v.src || e.target.tagName === 'SELECT') return;
+  const k = e.key.toLowerCase();
+  if (k === 'e') mark('enter'); else if (k === 'x') mark('exit');
+  else if (k === 'z') { marks.pop(); render(); }
+  else if (k === ' ') { v.paused ? v.play() : v.pause(); }
+  else if (k === 'arrowleft') v.currentTime -= 2; else if (k === 'arrowright') v.currentTime += 2;
+  else return;
+  e.preventDefault();
+});
+
+function download(name, obj) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+  a.download = name; a.click();
+}
+document.getElementById('saveZone').onclick = () => zone.length < 3 ? alert('No zone yet.') :
+  download('zone.json', { polygon: zone, frame_size: [v.videoWidth, v.videoHeight], video: fileName });
+document.getElementById('saveTruth').onclick = () => download('truth.json', {
+  video: fileName, duration_ms: Math.round(v.duration * 1000), labelled_at: new Date().toISOString(),
+  expected_visits: marks.filter(m => m.kind === 'enter').length,
+  enters_ms: marks.filter(m => m.kind === 'enter').map(m => m.ms),
+  exits_ms: marks.filter(m => m.kind === 'exit').map(m => m.ms) });
+</script>
+</body>
+</html>

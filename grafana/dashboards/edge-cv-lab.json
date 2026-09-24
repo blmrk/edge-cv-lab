@@ -1,0 +1,490 @@
+{
+  "uid": "edge-cv-lab",
+  "title": "Edge CV Lab",
+  "tags": [
+    "edge",
+    "cv"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "editable": true,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Visits counted: debounced",
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Footpoint anchor + hysteresis + minimum dwell.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS visits FROM zone_events WHERE kind='enter' AND counter='debounced' AND $__timeFilter(received_at)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Visits counted: naive",
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Centroid anchor, state flips on every boundary crossing.",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS visits FROM zone_events WHERE kind='enter' AND counter='naive' AND $__timeFilter(received_at)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Naive overcount factor",
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "How many times the naive counter counts each real visit.",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT round(count(*) FILTER (WHERE counter='naive')::numeric / NULLIF(count(*) FILTER (WHERE counter='debounced'),0), 1) AS factor FROM zone_events WHERE kind='enter' AND $__timeFilter(received_at)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Worst delivery lag",
+      "type": "stat",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Time from the event on the edge node to the row landing in Postgres. Spikes during chaos scenarios.",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT max(extract(epoch FROM received_at) - ts_ms/1000.0) AS lag FROM zone_events WHERE $__timeFilter(received_at)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Visits per minute",
+      "type": "timeseries",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Same traffic, two counting strategies.",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(received_at,'1m',0), counter AS metric, count(*) AS visits FROM zone_events WHERE kind='enter' AND $__timeFilter(received_at) GROUP BY 1,2 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "naive"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "debounced"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "green"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {}
+    },
+    {
+      "id": 6,
+      "title": "Device health",
+      "type": "table",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "App-level heartbeat. A node that is reachable but not processing frames shows a stale heartbeat or state=offline (MQTT last-will).",
+      "gridPos": {
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT device_id, state, fps, round(extract(epoch FROM now()-updated_at)) AS seconds_since_heartbeat FROM device_status ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 7,
+      "title": "Delivery lag (edge to database)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Run chaos/scenarios.sh outage 120: events queue on the edge, then arrive in a burst with high lag. None are lost.",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(received_at,'10s'), max(extract(epoch FROM received_at) - ts_ms/1000.0) AS lag_seconds FROM zone_events WHERE $__timeFilter(received_at) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 20
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 8,
+      "title": "Events received per 10 s",
+      "type": "timeseries",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Flat line during an outage, then a catch-up spike.",
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(received_at,'10s',0), count(*) AS events FROM zone_events WHERE $__timeFilter(received_at) GROUP BY 1 ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 9,
+      "title": "Net balance: enters minus exits (debounced)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Should hover near zero and never drift. Persistent drift means missed enters or exits.",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT received_at AS time, sum(CASE kind WHEN 'enter' THEN 1 ELSE -1 END) OVER (ORDER BY received_at) AS in_zone FROM zone_events WHERE counter='debounced' AND $__timeFilter(received_at) ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
+    },
+    {
+      "id": 10,
+      "title": "Dwell time distribution (debounced)",
+      "type": "histogram",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Seconds between enter and exit for each visit.",
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "WITH e AS (SELECT device_id, track_id, kind, ts_ms,\n       lead(ts_ms) OVER (PARTITION BY device_id, track_id ORDER BY ts_ms) AS next_ts,\n       lead(kind)  OVER (PARTITION BY device_id, track_id ORDER BY ts_ms) AS next_kind\n     FROM zone_events WHERE counter='debounced' AND $__timeFilter(received_at))\nSELECT (next_ts - ts_ms)/1000.0 AS dwell_seconds FROM e WHERE kind='enter' AND next_kind='exit'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "bucketSize": 1
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

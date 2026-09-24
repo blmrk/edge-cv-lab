@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+harness/runs/
+media/*
+harness/zone.json
+harness/truth.json
+!media/README.md
+*.pt
+.env

@@ -1,0 +1,3 @@
+- No employer, client or product names anywhere in this repo. Everything is framed as a generic industry problem.
+- Never fill a TBD metric with anything other than a measured result.
+- Don't change harness/replay/zones.py or trackers/ behaviour without updating tests.
