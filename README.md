@@ -59,7 +59,7 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 ## Quick start
 
-> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). `make broker-restart` has been run on a fresh lab: with ingest away for 60 s across a broker restart, all 846 events of the 3 finished scenes arrived exactly once. Not yet run: `make up-video` (edge + YOLO). `make visuals` and `make trackers` are not run in CI.
 
 **Harness (no Docker):**
 
@@ -104,6 +104,7 @@ chaos/scenarios.sh outage 120 # 2 minute disconnect
 chaos/scenarios.sh reset
 make delivery                 # did every event arrive exactly once? each finished scene vs its offline replay
 make drill                    # all of it on a fresh lab, ~9 min, with a delivery-lag table per phase
+make broker-restart           # fresh lab, ~5 min: ingest away across a broker restart, then the same check
 # Grafana: events flatline, then a catch-up spike with high delivery lag
 ```
 
@@ -119,6 +120,7 @@ make drill                    # all of it on a fresh lab, ~9 min, with a deliver
 | Boundary jitter inflates counts | State flips on every frame the anchor crosses the edge | N-frame and spatial hysteresis, minimum dwell, cooldown | `boundary_jitter.jsonl` |
 | Shadow pulls box into adjacent lane | Centroid moves when the box stretches | Bottom-centre footpoint anchor | `shadow_expansion.jsonl` |
 | Events lost on disconnect | Fire-and-forget publish | QoS 1, persistent session, bounded local queue | lab + `outage` |
+| Events lost when the broker restarts | Subscriber session kept only in broker memory | EMQX durable sessions on disk | lab + `make broker-restart` |
 | Double counting after reconnect | At-least-once redelivery | ULID `event_id` + `ON CONFLICT DO NOTHING` | lab + `outage` |
 | Next car inherits the previous car's ID, merging visits | IoU association plus a track left parked where a vehicle vanished | Ground-contact association with a lane-shaped gate and damped coasting | `queue.dets.jsonl` |
 | "Online" device that is actually dead | Health inferred from network reachability | App-level heartbeat with FPS, plus MQTT last-will | lab |
