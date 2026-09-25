@@ -44,6 +44,14 @@ def read_detections(path: str | Path) -> list[Detection]:
     return out
 
 
+VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".m4v", ".webm", ".mpg", ".mpeg"}
+
+
+def is_video_file(src: str | Path) -> bool:
+    """True only for a single existing video file. A directory, glob or .txt list is frames, which carry no fps."""
+    return Path(src).is_file() and Path(src).suffix.lower() in VIDEO_SUFFIXES
+
+
 def frame_from_filename(path: str | Path) -> int | None:
     """0-based frame from a 1-based numbered image name: img00001.jpg -> 0, 000123.jpg -> 122.
     None if the stem does not end in digits. Numbering by file name, not by read order, keeps
