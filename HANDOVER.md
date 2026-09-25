@@ -1,16 +1,17 @@
 # Handover
 
-Last updated 2026-09-24. Everything below has been run unless marked otherwise.
+Last updated 2026-09-25. Everything below has been run unless marked otherwise.
 
 ## Status
 
 | Piece | State |
 |---|---|
-| Replay harness, 14 tests | green locally and in CI |
+| Replay harness, 20 tests (`make test`) | green locally and in CI |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Tracker bench: greedy_iou, groundplane, boxmot adapter, MOT bridge | greedy_iou and groundplane tested; **boxmot adapter untested** (needs torch) |
-| Compose stack, sim profile, Grafana dashboard, outage scenario | **booted and working** on the owner's machine |
+| Compose stack, sim profile, Grafana dashboard | **booted and working** on the owner's machine |
+| Uplink drill: 64 kbps, latency, outage (`make drill`) | run on a fresh lab; every event of the finished scenes arrived exactly once (`make delivery`) |
 | Video profile (MediaMTX + YOLO edge) | **never run**: needs `media/sample.mp4` |
 | `tools/label.html` | JS syntax-checked, **never opened with a real clip** |
 | `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** |
@@ -78,10 +79,12 @@ python -m replay.track --dets runs/dets.jsonl --tracker boxmot_bytetrack --out r
 - Every `TBD` replaced or the row deleted. "What did not work" section written. Limitations honest.
 - Done: `docs/case-study-tracking.md` reads end to end without placeholders.
 
-### 10. Repo polish (owner, on GitHub)
-- About description, topics, social preview from `trackers.gif`. Grafana screenshot in README.
+### 10. Repo polish (done)
+- About description, topics and social preview (a `trackers.gif` frame) are set on GitHub. The Grafana screenshot is in README, from `docs/screenshots/`.
 
 ## Known rough edges
+- `DebouncedZoneCounter.margin_px=10` was set against the synthetic ±6 px edge jitter in a 1280 px frame. On a real
+  clip, check a parked vehicle's footpoint jitter and draw the zone so stops sit more than `margin_px` inside it.
 - `sim` service uses `SPEED=2`; Grafana FPS panel shows ~60. Not a bug.
 - `boxmot_adapter.py` guesses the `update()` return columns (x1,y1,x2,y2,id,conf,cls,det_index). Verify.
 - `groundplane` gate defaults (`gate_along=120`, `gate_across=40`) were tuned on the synthetic queue at
