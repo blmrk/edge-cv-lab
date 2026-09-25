@@ -23,6 +23,9 @@ services:
   emqx:
     image: emqx/emqx:5.8
     ports: ["18083:18083"]  # dashboard: admin / public
+    environment:  # keep ingest's session and its queued events on disk across a broker restart
+      EMQX_DURABLE_SESSIONS__ENABLE: "true"
+      EMQX_CLUSTER__DISCOVERY_STRATEGY: singleton  # required by the local durable storage backend
     healthcheck:
       test: ["CMD", "emqx", "ctl", "status"]
       interval: 5s
