@@ -15,17 +15,19 @@ never frames. Anything shown in this repo comes from the Pexels clip or self-sho
 
 ## UA-DETRAC in the harness
 
+Keep the download under `media/UA-DETRAC/`, which is gitignored, never under `harness/`.
+
 ```bash
 cd harness
 # 1. ground truth from the XML annotations (drops boxes inside the sequence's ignored regions)
-python scripts/detrac_to_gt.py --xml DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011
+python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011
 
 # 2. detections from the frame directory (25 fps; frames carry no rate)
-python scripts/dump_detections.py --video Insight-MVT_Annotation_Train/MVI_20011 --fps 25 --out runs/MVI_20011.dets.jsonl
+python scripts/dump_detections.py --video ../media/UA-DETRAC/Insight-MVT_Annotation_Train/MVI_20011 --fps 25 --out runs/MVI_20011.dets.jsonl
 
 # 3. draw a zone over the queueing area, away from runs/MVI_20011.ignored.json, then derive visit truth
 #    from the annotated tracks (perfect IDs) so trackers can be scored on visits as well as identity
-python scripts/detrac_to_gt.py --xml DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011 --zone runs/zone.json
+python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011 --zone runs/zone.json
 
 # 4. compare
 python -m replay.compare --dets runs/MVI_20011.dets.jsonl --zone runs/zone.json \
@@ -33,8 +35,8 @@ python -m replay.compare --dets runs/MVI_20011.dets.jsonl --zone runs/zone.json 
 ```
 
 To make an mp4 for `tools/label.html` or the lab's RTSP camera:
-`ffmpeg -framerate 25 -i Insight-MVT_Annotation_Train/MVI_20011/img%05d.jpg -c:v libx264 -pix_fmt yuv420p MVI_20011.mp4`
-(keep it out of git; it is research data).
+`ffmpeg -framerate 25 -i ../media/UA-DETRAC/Insight-MVT_Annotation_Train/MVI_20011/img%05d.jpg -c:v libx264 -pix_fmt yuv420p ../media/MVI_20011.mp4`
+(`media/` is gitignored; it is research data).
 
 The converter was written against the documented annotation format and tested on a synthetic file,
 not on a downloaded sequence. If a real file fails to parse, the element names are the first thing to check.

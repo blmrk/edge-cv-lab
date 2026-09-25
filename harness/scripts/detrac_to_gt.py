@@ -1,6 +1,6 @@
 """UA-DETRAC XML annotations -> harness ground truth.
 
-python scripts/detrac_to_gt.py --xml DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011 [--zone zone.json]
+python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011 [--zone zone.json]
 
 Writes:
   <out>.gt.jsonl        ground-truth tracks in the harness TrackBox schema (for --gt in replay.compare)

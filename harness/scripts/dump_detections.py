@@ -2,7 +2,7 @@
 Needs: pip install -e '.[video]'
 
 python scripts/dump_detections.py --video ../media/clip.mp4 --out runs/dets.jsonl
-python scripts/dump_detections.py --video Insight-MVT_Annotation_Train/MVI_20011 --fps 25 --out runs/MVI_20011.dets.jsonl
+python scripts/dump_detections.py --video ../media/UA-DETRAC/Insight-MVT_Annotation_Train/MVI_20011 --fps 25 --out runs/MVI_20011.dets.jsonl
 A directory of frames (UA-DETRAC style img00001.jpg ...) works too; pass --fps since images carry none.
 conf defaults to 0.1 on purpose: ByteTrack-style trackers use low-score boxes to ride through occlusion.
 """
