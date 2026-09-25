@@ -27,4 +27,4 @@ with no cameras, no edge boxes and no GPU. Read HANDOVER.md for status and the t
   capture steps noted where each is used.
 
 ## Commands
-`make test` `make fixtures` `make visuals` `make trackers` `make up` `make up-video` `make down` `make logs` `make counts` `make delivery` `make drill`
+`make test` `make fixtures` `make visuals` `make trackers` `make up` `make up-video` `make down` `make logs` `make counts` `make delivery` `make drill` `make broker-restart`
