@@ -44,12 +44,20 @@ def read_detections(path: str | Path) -> list[Detection]:
     return out
 
 
-VIDEO_SUFFIXES = {".mp4", ".avi", ".mov", ".mkv", ".m4v", ".webm", ".mpg", ".mpeg"}
+IMAGE_SUFFIXES = {".bmp", ".dng", ".jpeg", ".jpg", ".mpo", ".png", ".tif", ".tiff", ".webp", ".pfm", ".heic"}
 
 
-def is_video_file(src: str | Path) -> bool:
-    """True only for a single existing video file. A directory, glob or .txt list is frames, which carry no fps."""
-    return Path(src).is_file() and Path(src).suffix.lower() in VIDEO_SUFFIXES
+def is_image(path: str | Path) -> bool:
+    """A file the detector reads as a single image frame (ultralytics' image formats)."""
+    return Path(str(path)).suffix.lower() in IMAGE_SUFFIXES
+
+
+def is_frame_source(src: str | Path) -> bool:
+    """A directory, glob, .txt list or image: frames, which carry no fps. Anything else (a video in any
+    format, a stream URL, a webcam index) is read as video, numbered in read order at its own fps."""
+    s = str(src)
+    glob = "://" not in s and any(c in s for c in "*?[")  # a stream URL may carry a '?' query
+    return Path(s).is_dir() or glob or s.lower().endswith(".txt") or is_image(s)
 
 
 def frame_from_filename(path: str | Path) -> int | None:
