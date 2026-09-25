@@ -5,7 +5,7 @@ number and image in the repo can be traced to a source and a licence. One row pe
 
 | File | Source and URL | Author | Licence | Downloaded | Used for | Shown publicly? |
 |---|---|---|---|---|---|---|
-| `sample.mp4` | TBD | TBD | TBD | YYYY-MM-DD | lab demo, hero GIF | yes |
+| `sample.mp4` | Pexels 5124507, https://www.pexels.com/video/5124507/ (fetched from Kaggle `arunavfc11/indian-traffic-videos`, file `5124507-hd_1920_1080_30fps.mp4`, same byte size as on Pexels' file server) | TBD: confirm on the Pexels page (it blocks automated access) | Pexels License | 2026-09-25 | video-profile plumbing test only; handheld, so no zone metrics | no |
 | `mot17-04.mp4` | MOTChallenge, https://motchallenge.net/data/MOT17 | Milan et al. | CC BY-NC-SA 3.0 | YYYY-MM-DD | tracker metrics only | no, metrics and citation only |
 
 ## Rules for this repo
