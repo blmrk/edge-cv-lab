@@ -8,6 +8,7 @@ sees exactly the same boxes, and the detector (the slow part) runs once.
 from __future__ import annotations
 
 import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,14 @@ def read_detections(path: str | Path) -> list[Detection]:
             except (KeyError, ValueError, TypeError) as exc:
                 raise ValueError(f"{path}:{n}: bad detection record: {exc}") from exc
     return out
+
+
+def frame_from_filename(path: str | Path) -> int | None:
+    """0-based frame from a 1-based numbered image name: img00001.jpg -> 0, 000123.jpg -> 122.
+    None if the stem does not end in digits. Numbering by file name, not by read order, keeps
+    detections aligned with ground truth when a frame in the middle is unreadable and skipped."""
+    m = re.search(r"(\d+)$", Path(path).stem)
+    return int(m.group(1)) - 1 if m else None
 
 
 def frames(dets: list[Detection]) -> Iterator[tuple[int, int, list[Detection]]]:
