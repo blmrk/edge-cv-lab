@@ -12,7 +12,7 @@ Last updated 2026-09-25. Everything below has been run unless marked otherwise.
 | Tracker bench: greedy_iou, groundplane, boxmot adapter, MOT bridge | greedy_iou and groundplane tested; **boxmot adapter untested** (needs torch) |
 | Compose stack, sim profile, Grafana dashboard | **booted and working** on the owner's machine |
 | Uplink drill: 64 kbps, latency, outage (`make drill`) | run on a fresh lab; every event of the finished scenes arrived exactly once (`make delivery`) |
-| Video profile (MediaMTX + YOLO edge) | **never run**: needs `media/sample.mp4` |
+| Video profile (MediaMTX + YOLO edge) | **booted** on a short handheld stock clip: `edge-01` events reach Postgres and Grafana. Zone accuracy not measured; needs a fixed-camera clip |
 | `tools/label.html` | JS syntax-checked, **never opened with a real clip** |
 | `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** |
 | Case study `docs/case-study-tracking.md` | template; all real-footage numbers are `TBD` |
@@ -27,6 +27,8 @@ Each task lists the command and what "done" means. Do them in order; later ones 
 - `make up-video`, then `make counts`. Fix whatever breaks in `services/edge` (likely: torch install
   time, RTSP reconnect, zone polygon for this clip's pixel coordinates).
 - Done: `zone_events` rows arrive from `edge-01` and Grafana shows them.
+- Status: done as a plumbing test on Pexels 5124507, which turned out to be handheld (the view drifts and zooms).
+  Tasks 2-3 need a fixed-camera clip: swap `media/sample.mp4` and log it in `media/SOURCES.md`.
 
 ### 2. Label the clip
 - Open `tools/label.html`, draw the zone over the stopping area, label at 2x, two passes.
@@ -86,6 +88,7 @@ python -m replay.track --dets runs/dets.jsonl --tracker boxmot_bytetrack --out r
 - About description, topics and social preview (a `trackers.gif` frame) are set on GitHub. The Grafana screenshot is in README, from `docs/screenshots/`.
 
 ## Known rough edges
+- The edge logs `Waiting for stream 0` whenever inference catches up with the RTSP stream. Log noise, not a stall.
 - `DebouncedZoneCounter.margin_px=10` was set against the synthetic ±6 px edge jitter in a 1280 px frame. On a real
   clip, check a parked vehicle's footpoint jitter and draw the zone so stops sit more than `margin_px` inside it.
 - `sim` service uses `SPEED=2`; Grafana FPS panel shows ~60. Not a bug.
