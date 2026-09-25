@@ -2,8 +2,8 @@
 
 Stock sites are full of drones and timelapses. For genuinely fixed CCTV footage with tracking ground
 truth, use the research benchmarks below. They are research-licensed: publish metrics and a citation,
-never frames. Anything shown in this repo comes from the Pexels clip or self-shot footage
-(see `media/SOURCES.md`).
+never frames. Anything shown in this repo is synthetic or from republishable footage
+logged in `media/SOURCES.md`.
 
 | Dataset | Scene | Ground truth | Best for | Notes |
 |---|---|---|---|---|
@@ -11,7 +11,7 @@ never frames. Anything shown in this repo comes from the Pexels clip or self-sho
 | Urban Tracker (Polytechnique Montreal) | Static intersection cameras | Boxes + IDs, vehicles and pedestrians | Zone dwell, turning traffic | Small, free for research |
 | GRAM Road-Traffic Monitoring | Fixed road cameras | Boxes + IDs | Flow counting | Free for research |
 | AAU RainSnow | Lamp-post intersection cameras | Boxes | Bad-weather robustness | Confirm licence on Kaggle |
-| CDnet 2014 (`highway`, `traffic`) | Static clips | Change masks only | Detector sanity checks | No track IDs |
+| CDnet 2014 (`highway`) | Static clip, baseline category | Change masks only | Detector sanity checks | No track IDs. Not `traffic`: it is in the camera-jitter category |
 
 ## UA-DETRAC in the harness
 
