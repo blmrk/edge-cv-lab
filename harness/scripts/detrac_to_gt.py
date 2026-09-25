@@ -9,7 +9,7 @@ Writes:
                         annotated tracks (perfect IDs). Good for scoring trackers; not a substitute for
                         hand labels if you are evaluating the counter itself.
 
-Format handled (both the original and v3 annotation releases):
+Format, as given in the dataset documentation (not yet checked against a downloaded file):
   <sequence name="MVI_20011">
     <ignored_region><box left=".." top=".." width=".." height=".."/></ignored_region>
     <frame num="1"><target_list><target id="1"><box left=".." top=".." width=".." height=".."/>
@@ -41,7 +41,7 @@ def _inside(b, region) -> bool:
     return region[0] <= cx <= region[2] and region[1] <= cy <= region[3]
 
 
-def convert(xml_path: Path, fps: int = FPS):
+def convert(xml_path: Path, fps: float = FPS):
     root = ET.parse(xml_path).getroot()
     ignored = [_box(b) for b in root.findall("./ignored_region/box")]
     tracks: list[TrackBox] = []
@@ -67,7 +67,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--xml", required=True)
     ap.add_argument("--out", required=True, help="output stem, e.g. runs/MVI_20011")
-    ap.add_argument("--fps", type=int, default=FPS)
+    ap.add_argument("--fps", type=float, default=FPS)
     ap.add_argument("--zone", help="zone.json; also emit <out>.truth.json from the annotated tracks")
     a = ap.parse_args()
 

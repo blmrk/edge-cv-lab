@@ -112,3 +112,14 @@ def test_main_with_zone_writes_truth_from_debounced_counter(tmp_path, monkeypatc
     assert len(enters) == 1  # the fixture really produces a visit, so the comparison below is not 0 == 0
     assert (truth["expected_visits"], truth["enters_ms"]) == (len(enters), enters)
     assert len(list(read_tracks(f"{out}.gt.jsonl"))) == 80
+
+
+def test_main_fps_takes_a_float(tmp_path, monkeypatch):
+    xml = tmp_path / "seq.xml"
+    xml.write_text(XML)
+    out = tmp_path / "seq"
+
+    _main(monkeypatch, "--xml", str(xml), "--out", str(out), "--fps", "12.5")
+
+    rows = [json.loads(line) for line in open(f"{out}.gt.jsonl")]
+    assert [r["ts_ms"] for r in rows] == [int(r["frame"] * 1000 / 12.5) for r in rows] == [0, 0, 0, 240, 2000]
