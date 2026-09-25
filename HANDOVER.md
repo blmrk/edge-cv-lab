@@ -41,7 +41,9 @@ python scripts/dump_detections.py --video ../media/sample.mp4 --out runs/dets.js
 python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json \
     --trackers greedy_iou:max_age=5 greedy_iou groundplane
 ```
-- If traffic is not left-to-right, pass `groundplane:lane_dir=[dx,dy]`.
+- If traffic is not left-to-right, track separately (compare's tracker spec splits on commas, so a list cannot go in it):
+  `python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lane_dir=[dx,dy]' --out runs/ground.jsonl`,
+  then pass `--tracks groundplane=runs/ground.jsonl` to `replay.compare`.
 - Done: the table is pasted into the case study "Baseline" and "Fixes" sections with the exact command.
 
 ### 4. Real-footage visuals
