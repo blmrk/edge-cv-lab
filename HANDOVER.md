@@ -92,7 +92,7 @@ python -m replay.track --dets runs/dets.jsonl --tracker boxmot_bytetrack --out r
 - `groundplane` gate defaults (`gate_along=120`, `gate_across=40`) were tuned on the synthetic queue at
   10 fps and 1280 px wide. Real clips at 25 to 30 fps need smaller gates per frame.
 - `DebouncedZoneCounter.lost_ms=3000` closes a visit whose track went silent. On real footage with
-  detector flicker inside the zone this may close visits early; watch `missed_visits`.
+  detector flicker inside the zone this may close a visit early and count the vehicle again when its track returns; watch `false_visits`.
 
 ## Kick-off prompt for Claude Code
 > Read CLAUDE.md and HANDOVER.md. Start at task 1. Run `make test` first and keep it green. Commit after
