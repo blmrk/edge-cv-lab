@@ -26,6 +26,7 @@ from .trackers import create
 from .viz import BG, FONT, LINE, ROAD, TEXT, ZONE_C, _palette, draw_zone
 
 W = 1280
+TAG_COLOURS = 24  # over footage, ID colours cycle through this many hues so each gets an exact GIF palette entry
 
 
 class _Clip:
@@ -50,10 +51,11 @@ class _Clip:
         return img
 
 
-def save_fixed_camera_gif(images: list[np.ndarray], out: str, fps: int, hold: int = 20, colors: int = 128):
+def save_fixed_camera_gif(images: list[np.ndarray], out: str, fps: int, hold: int = 20, colors: int = 128, keep=()):
     """GIF of footage from a fixed camera, a fraction of the size of a plain GIF. A pixel that changed by less than
     `hold` levels since it was last drawn keeps its drawn value (sensor and codec noise), and every frame shares one
-    palette, so the static background repeats exactly and Pillow writes it as transparent runs."""
+    palette, so the static background repeats exactly and Pillow writes it as transparent runs.
+    `keep`: RGB colours given exact palette entries (overlay colours), which median cut over footage would merge."""
     from PIL import Image
 
     held, frames = images[0].astype(np.int16), []
@@ -63,7 +65,11 @@ def save_fixed_camera_gif(images: list[np.ndarray], out: str, fps: int, hold: in
         held[moved] = cur[moved]
         frames.append(held.astype(np.uint8))
     sample = np.concatenate(frames[:: max(1, len(frames) // 8)], axis=0)
-    palette = Image.fromarray(sample).quantize(colors, method=Image.Quantize.MEDIANCUT)
+    keep = [tuple(int(v) for v in c) for c in dict.fromkeys(tuple(c) for c in keep)]
+    base = Image.fromarray(sample).quantize(colors - len(keep), method=Image.Quantize.MEDIANCUT)
+    entries = [v for c in keep for v in c] + base.getpalette()[: 3 * (colors - len(keep))]
+    palette = Image.new("P", (1, 1))
+    palette.putpalette(entries + [0] * (768 - len(entries)))
     gif = [Image.fromarray(f).quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
     gif[0].save(out, save_all=True, append_images=gif[1:], duration=round(1000 / fps), loop=0, optimize=True)
 
@@ -106,19 +112,21 @@ def main():
 
     stamps = {d.frame: d.ts_ms for d in dets}
     first, last = min(stamps), max(stamps)
-    fps = 1000 * (last - first) / max(stamps[last] - stamps[first], 1)
+    clip = _Clip(a.video) if a.video else None
+    fps = (clip.cap.get(cv2.CAP_PROP_FPS) if clip else 0) or \
+        1000 * (last - first) / max(stamps[last] - stamps[first], 1)   # dets ts_ms are truncated: prefer the clip's
     try:
         f0, f1 = frame_window(first, last, fps, a.start, a.seconds)
     except ValueError as exc:
         ap.error(str(exc))
-    clip = _Clip(a.video) if a.video else None
     y1, y2 = a.crop or ([0, 10**6] if clip else [230, 520])
     images = []
     for f, ts, ds in frames(dets):
         if f > f1:
             break
         strips = []
-        shown = f >= f0 and not (f % a.every and f != f1)
+        phase = f0 if clip else 0                                     # over footage the window's first frame is drawn
+        shown = f >= f0 and ((f - phase) % a.every == 0 or f == f1)
         bg = clip.frame(f) if clip and shown else None
         for r in runs:
             boxes = r["tracker"].update(f, ts, ds)
@@ -150,7 +158,7 @@ def main():
                 cv2.putText(img, "pillar", (a.occluder[0] + 22, 292), FONT, 0.6, (150, 150, 150), 1, cv2.LINE_AA)
             for b in boxes:
                 bx1, by1, bx2, by2 = map(int, b.bbox)
-                c = _palette(b.track_id)
+                c = _palette(b.track_id % TAG_COLOURS if bg is not None else b.track_id)
                 cv2.rectangle(img, (bx1, by1), (bx2, by2), c, 3)
                 if bg is None:
                     cv2.putText(img, f"#{b.track_id}", (bx1, by1 - 8), FONT, 0.8, c, 2, cv2.LINE_AA)
@@ -181,7 +189,8 @@ def main():
 
     images += [images[-1]] * (a.fps * 2)                              # hold the final frame
     if clip:
-        save_fixed_camera_gif(images, a.out, a.fps)
+        overlay = [_palette(i) for i in range(TAG_COLOURS)] + [ZONE_C, TEXT, (0, 0, 0), (200, 200, 200)]
+        save_fixed_camera_gif(images, a.out, a.fps, keep=[c[::-1] for c in overlay])   # BGR -> RGB
     else:
         imageio.mimsave(a.out, images, duration=1 / a.fps, loop=0)
     for r in runs:
