@@ -12,7 +12,7 @@ Last updated 2026-09-25. Everything below has been run unless marked otherwise.
 | Tracker bench: greedy_iou, groundplane, boxmot adapter, MOT bridge | greedy_iou and groundplane tested; **boxmot adapter untested** (needs torch) |
 | Compose stack, sim profile, Grafana dashboard | **booted and working** on the owner's machine |
 | Uplink drill: 64 kbps, latency, outage (`make drill`) | run on a fresh lab; every event of the finished scenes arrived exactly once (`make delivery`) |
-| Video profile (MediaMTX + YOLO edge) | **booted** on a short handheld stock clip: `edge-01` events reach Postgres and Grafana. Zone accuracy not measured; needs a fixed-camera clip |
+| Video profile (MediaMTX + YOLO edge) | **booted** on a fixed CCTV intersection clip (MTID, see `media/SOURCES.md`): `edge-01` events reach Postgres and Grafana. Zone accuracy not measured yet: the zone for this view comes from task 2 |
 | `tools/label.html` | JS syntax-checked, **never opened with a real clip** |
 | `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** |
 | Case study `docs/case-study-tracking.md` | template; all real-footage numbers are `TBD` |
@@ -27,8 +27,9 @@ Each task lists the command and what "done" means. Do them in order; later ones 
 - `make up-video`, then `make counts`. Fix whatever breaks in `services/edge` (likely: torch install
   time, RTSP reconnect, zone polygon for this clip's pixel coordinates).
 - Done: `zone_events` rows arrive from `edge-01` and Grafana shows them.
-- Status: done as a plumbing test on Pexels 5124507, which turned out to be handheld (the view drifts and zooms).
-  Tasks 2-3 need a fixed-camera clip: swap `media/sample.mp4` and log it in `media/SOURCES.md`.
+- Status: done. A handheld stock clip proved the plumbing; `media/sample.mp4` is now the fixed MTID intersection camera.
+  The edge still runs the default `ZONE_POLYGON` until task 2 draws the real zone; then set it in `docker-compose.yml`.
+  The dataset's own annotations for the same frames are kept in `media/candidates/mtid/annotations/` (not yet inspected).
 
 ### 2. Label the clip
 - Open `tools/label.html`, draw the zone over the stopping area, label at 2x, two passes.
