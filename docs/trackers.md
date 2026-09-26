@@ -74,4 +74,7 @@ Check each repository's licence before depending on it, and record what you ran 
 ## Metrics
 
 `id_switches` and `id_transfers` in `replay/idmetrics.py` are small and unit-testable. For numbers
-you intend to publish, export with `replay.motformat export-tracks` and use TrackEval (HOTA, IDF1).
+you intend to publish, `scripts/trackeval_run.py --gt GT --tracks NAME=PATH ...` exports the ground truth and each
+tracker in MOTChallenge format and runs TrackEval (HOTA, DetA, AssA, IDF1, MOTA, IDSW); clone TrackEval first, as its
+docstring says. The two switch counts differ by definition: the harness matches each frame greedily, TrackEval's CLEAR
+matching keeps the previous pairing when it can, so the harness count is the higher one.
