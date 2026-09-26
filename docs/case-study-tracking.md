@@ -8,23 +8,31 @@ Zone-based vehicle analytics report inflated visit counts and wrong dwell times.
 
 ## Reproducing it without hardware
 
-- Footage: `TBD` (source, licence, duration, resolution, camera angle)
+- Footage: MTID (Multi-View Traffic Intersection Dataset) infrastructure camera: a fixed, pole-mounted camera looking
+  obliquely down on a signalised intersection, daytime, overcast. CC BY 4.0, M. B. Jensen, A. Møgelmose, T. B. Moeslund
+  (Aalborg University). 1024x640 at 30 fps, 3199 frames, 106.63 s (`ffprobe media/sample.mp4`). Source, build command and
+  citation in `media/SOURCES.md`.
 - Ground truth: 14 visits in the zone drawn in `tools/label.html` (`harness/zone.json`). Two independent visual passes over
   0.5 s contact sheets found 14 and 12 (pass-to-pass difference 2); a third pass derived from the dataset's annotated tracks
   found 20 for frames 1-3099, counting vehicles that run along the zone edge. A visit counts when at least two of the three
   passes include it. Clip logged in `media/SOURCES.md`.
-- Tracks: `dump_tracks.py` with `yolov8n`, run once per tracker and saved under `harness/runs/` (gitignored; regenerate each with `dump_tracks.py` as in Reproduce below)
-- Zone: polygon in `TBD.json`, screenshot below
+- Detections and tracks: `yolov8n` on CPU inside the edge image. `dump_detections.py` feeds the harness trackers and
+  `dump_tracks.py` gives ByteTrack's own tracks, saved under `harness/runs/` (gitignored; the Reproduce commands regenerate them)
+- Zone: polygon in `harness/zone.json`, drawn in `tools/label.html` over the crossing lanes; the edge uses the same polygon
+  (`ZONE_POLYGON` in `docker-compose.yml`)
 
 ## Baseline
 
-| Metric | Naive counter + ByteTrack |
-|---|---|
-| Enter events vs ground truth | TBD |
-| Precision / recall / F1 of visits (`replay.score`, 2 s tolerance) | TBD |
-| Tracks with more than one enter | TBD |
-| Net balance (enters minus exits) | TBD |
-| ID switches / IDF1 / HOTA (TrackEval) | TBD |
+| Metric | Naive counter + ByteTrack | Debounced counter + ByteTrack |
+|---|---|---|
+| Enter events vs ground truth (14) | 78 (+457.1%) | 39 (+178.6%) |
+| Precision / recall / F1 of visits (`replay.score`, 2 s tolerance) | 0.167 / 0.929 / 0.283 | 0.359 / 1.0 / 0.528 |
+| Tracks with more than one enter | 0 | 0 |
+| Net balance (enters minus exits) | 66 | 3 |
+| ID switches / IDF1 / HOTA (TrackEval) | TBD | TBD |
+
+No track re-enters the zone, so every extra visit is a new track ID for a vehicle already counted: on this footage the
+tracker, not the zone logic, drives the error. The debounced counter still removes most of the naive counter's excess.
 
 Add a GIF of the worst offender here. One clip of a box flickering on a boundary explains more than a table.
 
@@ -32,14 +40,24 @@ Add a GIF of the worst offender here. One clip of a box flickering on a boundary
 
 | Change | Enter error | Notes |
 |---|---|---|
-| Baseline | TBD | |
+| Baseline | +457.1% (78 vs 14) | naive centroid counter on ByteTrack tracks |
 | + footpoint anchor | TBD | |
 | + hysteresis (5 in / 8 out) | TBD | |
 | + edge margin (10 px) | TBD | parked on the zone edge |
 | + min dwell 1 s, cooldown 1.5 s | TBD | |
-| + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | TBD | identity handover impact |
+| All counter fixes together (debounced footpoint) | +178.6% (39 vs 14) | same ByteTrack tracks; per-step rows above still need an ablation run |
+| + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | table below | best here: `greedy_iou:max_age=5`, 21 vs 14 |
 
 Report each step separately. An ablation is more convincing than one before/after pair.
+
+Tracker swap on the same detections, debounced counter (`replay.compare`, commands in Reproduce):
+
+| tracker | labelled | predicted | missed visits | false visits | f1 |
+|---|---|---|---|---|---|
+| greedy_iou:max_age=5 | 14 | 21 | 2 | 9 | 0.686 |
+| greedy_iou | 14 | 31 | 1 | 18 | 0.578 |
+| groundplane | 14 | 38 | 0 | 24 | 0.538 |
+| bytetrack | 14 | 39 | 0 | 25 | 0.528 |
 
 ## Synthetic confirmation
 
@@ -53,7 +71,11 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
 
 ## What did not work
 
-TBD. Keep this section. Parameters that over-suppressed real short visits, cases where footpoint was worse, and so on.
+- `groundplane`, the tracker that fixes the synthetic queue, does not help at this intersection: F1 0.538, and 0.56 with
+  its lane direction set along the zone (`--param 'lane_dir=[0.85,0.53]'`). One lane direction cannot describe turning
+  traffic from several approaches, and its gates were tuned on the synthetic queue at 10 fps.
+
+Keep this section. Parameters that over-suppressed real short visits, cases where footpoint was worse, and so on.
 
 ## Limitations
 
@@ -62,7 +84,16 @@ Single camera angle, daytime footage, small ground-truth set, CPU-only model.
 ## Reproduce
 
 ```bash
-pip install -e "harness[dev,video]"
-python harness/scripts/dump_tracks.py --video media/sample.mp4 --out harness/runs/bytetrack.jsonl
-python -m replay.score --tracks harness/runs/bytetrack.jsonl --zone zone.json --truth truth.json
+pip install -e "harness[dev]"   # scoring; detection runs in the edge image that `make up-video` builds
+docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
+  python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --out runs/dets.jsonl
+docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
+  python scripts/dump_tracks.py --video ../media/sample.mp4 --model /app/yolov8n.pt --tracker bytetrack.yaml --out runs/bytetrack.jsonl
+cd harness
+python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json
+python -m replay.cli --tracks runs/bytetrack.jsonl --zone zone.json --expected 14
+python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json \
+    --trackers greedy_iou:max_age=5 greedy_iou groundplane --tracks bytetrack=runs/bytetrack.jsonl
+python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lane_dir=[0.85,0.53]' --out runs/groundplane_diag.jsonl
+python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json --tracks groundplane_diagonal=runs/groundplane_diag.jsonl
 ```
