@@ -49,6 +49,19 @@ def test_trackeval_scores_perfect_tracks_one_and_counts_a_switch():
     assert res["switched"]["IDF1"] == pytest.approx(0.75)  # car 1 keeps its best ID for 5 of 10 frames
 
 
+@pytest.mark.skipif(not TRACKEVAL.exists(), reason="TrackEval not cloned into .cache/TrackEval")
+def test_frames_after_the_last_annotated_one_are_not_scored():
+    # the tracker keeps following both cars for 5 frames nobody annotated: not false positives
+    spec = importlib.util.spec_from_file_location("trackeval_run", SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    res = mod.evaluate(_two_cars(10), {"longer": _two_cars(15)}, TRACKEVAL)
+
+    assert res["longer"]["MOTA"] == pytest.approx(1.0)
+    assert res["longer"]["HOTA"] == pytest.approx(1.0)
+
+
 def test_tracks_names_may_hold_an_equals_sign(tmp_path, monkeypatch, capsys):
     import sys
     spec = importlib.util.spec_from_file_location("trackeval_run", SCRIPT)

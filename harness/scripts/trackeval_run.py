@@ -1,13 +1,15 @@
 """HOTA, IDF1 and ID switches from TrackEval for replay tracks against ground-truth tracks (e.g. mtid_to_gt.py output).
 
-TrackEval is not a dependency. Clone it once, at the pinned commit (MIT licence):
+TrackEval is not a dependency. Clone it once, at the pinned commit (MIT licence); it needs numpy and scipy:
+  pip install -e ".[trackeval]"
   git clone https://github.com/JonathonLuiten/TrackEval ../.cache/TrackEval && git -C ../.cache/TrackEval checkout 12c8791
 
 python scripts/trackeval_run.py --gt runs/mtid.gt.jsonl --tracks bytetrack=runs/bytetrack.jsonl greedy_iou_5=runs/greedy_iou_5.jsonl
 
 Vehicles are scored as MOTChallenge class 1 with TrackEval's pedestrian preprocessing off: the class only picks which
 rows count, so this runs its 2D box metrics unchanged on vehicles. HOTA, DetA and AssA are means over TrackEval's
-localisation thresholds (IoU 0.05 to 0.95); IDF1, MOTA and IDSW are at IoU 0.5.
+localisation thresholds (IoU 0.05 to 0.95); IDF1, MOTA and IDSW are at IoU 0.5. Only the ground truth's frame range
+(first to last annotated frame) is scored: tracks past it would count as false positives in frames nobody annotated.
 """
 from __future__ import annotations
 
@@ -15,8 +17,6 @@ import argparse
 import sys
 import tempfile
 from pathlib import Path
-
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from replay.motformat import export_gt, export_tracks  # noqa: E402
@@ -29,6 +29,8 @@ COLS = ["HOTA", "DetA", "AssA", "IDF1", "MOTA", "IDSW"]
 def _trackeval(path: Path):
     if not (path / "trackeval").is_dir():
         raise SystemExit(f"TrackEval not found at {path}: clone it first (see this script's docstring)")
+    import numpy as np
+
     # ponytail: TrackEval 12c8791 still uses np.int / np.float / np.bool, removed in numpy 1.24. They were aliases of
     # the builtins, so restoring them is exact; drop this once TrackEval is patched upstream.
     for name, builtin in (("int", int), ("float", float), ("bool", bool)):
@@ -42,8 +44,12 @@ def _trackeval(path: Path):
 def evaluate(gt, runs: dict, trackeval_dir: Path = TRACKEVAL) -> dict:
     """runs: {name: [TrackBox]}; returns {name: {HOTA, DetA, AssA, IDF1, MOTA, IDSW}} over the one sequence."""
     te = _trackeval(Path(trackeval_dir))
+    import numpy as np
+
     seq = "clip"
-    length = 1 + max(b.frame for boxes in [gt, *runs.values()] for b in boxes)
+    first, last = min(b.frame for b in gt), max(b.frame for b in gt)
+    runs = {name: [b for b in boxes if first <= b.frame <= last] for name, boxes in runs.items()}
+    length = last + 1
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "gt" / seq / "gt").mkdir(parents=True)

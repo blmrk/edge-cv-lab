@@ -8,6 +8,7 @@ dependencies = []
 dev = ["pytest>=8"]
 video = ["ultralytics>=8.3", "opencv-python-headless"]
 viz = ["opencv-python-headless", "numpy", "matplotlib", "imageio", "pillow>=9.1"]  # 9.1: Image.Quantize and Image.Dither enums
+trackeval = ["numpy", "scipy"]  # scripts/trackeval_run.py; TrackEval itself is cloned, see its docstring
 
 [tool.setuptools.packages.find]
 include = ["replay*"]
