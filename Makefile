@@ -1,4 +1,4 @@
-.PHONY: test fixtures visuals trackers up up-video down logs counts delivery drill broker-restart
+.PHONY: test fixtures visuals trackers footage up up-video down logs counts delivery drill broker-restart
 ALL = --profile sim --profile video
 Z = fixtures/zone.json
 T = fixtures/traffic.jsonl
@@ -21,6 +21,14 @@ trackers:  ## tracker comparison table + space-time diagram on the queue fixture
 	      --trackers "greedy_iou:max_age=5" greedy_iou groundplane \
 	      --labels "IoU tracker, 0.5 s buffer" "IoU tracker, 3 s buffer" "ground-plane tracker" \
 	      --occluder 440 560 --every 3 --fps 10 --width 800 --out ../docs/img/trackers.gif
+# footage needs media/sample.mp4 and harness/runs/dets.jsonl, both gitignored: docs/case-study-tracking.md, Reproduce,
+# makes the detections. 20-33 s holds 5 of the 14 labelled visits in harness/truth.json.
+footage:   ## tracker comparison over the real clip, not the fixture: docs/footage/real-compare.gif
+	cd harness && mkdir -p ../docs/footage \
+	 && python -m replay.trackviz --video ../media/sample.mp4 --dets runs/dets.jsonl --zone zone.json \
+	      --trackers greedy_iou "greedy_iou:max_age=5" \
+	      --labels "greedy_iou, 1 s buffer" "greedy_iou:max_age=5, 0.17 s buffer" \
+	      --start 20 --seconds 13 --crop 0 600 --every 3 --fps 10 --width 640 --out ../docs/footage/real-compare.gif
 up:        ; docker compose --profile sim up -d --build     # synthetic traffic, no video needed
 up-video:  ; docker compose --profile video up -d --build   # needs media/sample.mp4
 down:      ; docker compose $(ALL) down -v
