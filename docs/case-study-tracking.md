@@ -38,7 +38,7 @@ ID switches are counted against ground-truth tracks built from the dataset's own
 along the top of the frame, partly under the burned-in timestamp band, where few detections land.
 
 No track re-enters the zone, so every extra visit is a new track ID for a vehicle already counted: on this footage the
-tracker, not the zone logic, drives the error. The debounced counter still removes most of the naive counter's excess.
+tracker, not the zone logic, drives the error, helped by the detector's per-class duplicate boxes (see Detector fix). The debounced counter still removes most of the naive counter's excess.
 
 Add a GIF of the worst offender here. One clip of a box flickering on a boundary explains more than a table.
 
@@ -52,7 +52,7 @@ Add a GIF of the worst offender here. One clip of a box flickering on a boundary
 | + edge margin (10 px) | +364.3% (65) | parked on the zone edge |
 | + min dwell 1 s, cooldown 1.5 s | +178.6% (39) | largest single step: fragment tracks shorter than a second no longer count |
 | + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | table below | best here: `greedy_iou:max_age=5`, 21 vs 14 |
-| + class-agnostic NMS (detector) | +85.7% (26) | `greedy_iou:max_age=5`: F1 0.686 to 0.7, missed visits 2 to 0, ID switches 368 to 68 |
+| + class-agnostic NMS (detector) | +85.7% (26) | `greedy_iou:max_age=5`: count 21 to 26, worse (see below), but F1 0.686 to 0.7, missed visits 2 to 0, ID switches 368 to 68 |
 
 Report each step separately. An ablation is more convincing than one before/after pair.
 
@@ -129,8 +129,9 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
   visit. Diagnosis: every extra enter is on the zone's two far edges, from traffic on the far road and in the lane just
   beyond them. On this oblique view a box's bottom-centre is not the vehicle's ground contact: it sits below the vehicle,
   towards the camera, so vehicles running just outside the far edges dip in, while the centroid sits too high. It is not
-  box-height flicker, and not the duplicate boxes: with class-agnostic NMS the footpoint step is still worse, +435.7%
-  against +342.9% on ByteTrack and +971.4% against +864.3% on `greedy_iou:max_age=5`. A ground-contact point from a
+  box-height flicker, and the duplicate boxes are not why: removing them lowers both anchors' counts, and with
+  class-agnostic NMS the footpoint step is still worse, +435.7% against +342.9% on ByteTrack and +971.4% against
+  +864.3% on `greedy_iou:max_age=5`. A ground-contact point from a
   road-plane mapping would fix the anchor properly; tuning the anchor height on 14 visits would fit noise.
 - `groundplane`, the tracker that fixes the synthetic queue, does not help at this intersection: F1 0.538, and 0.56 with
   its lane direction set along the zone (`--param 'lane_dir=[0.85,0.53]'`); 0.609 and 0.596 with class-agnostic NMS,
