@@ -1,21 +1,21 @@
 # Handover
 
-Last updated 2026-09-25. Everything below has been run unless marked otherwise.
+Last updated 2026-09-26. Everything below has been run unless marked otherwise.
 
 ## Status
 
 | Piece | State |
 |---|---|
-| Replay harness, 20 tests (`make test`) | green locally and in CI |
+| Replay harness, 92 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
-| Tracker bench: greedy_iou, groundplane, boxmot adapter, MOT bridge | greedy_iou and groundplane tested; **boxmot adapter untested** (needs torch) |
-| Compose stack, sim profile, Grafana dashboard | **booted and working** on the owner's machine |
-| Uplink drill: 64 kbps, latency, outage (`make drill`) | run on a fresh lab; every event of the finished scenes arrived exactly once (`make delivery`) |
-| Video profile (MediaMTX + YOLO edge) | **booted** on a fixed CCTV intersection clip (MTID, see `media/SOURCES.md`): `edge-01` events reach Postgres and Grafana. Zone accuracy not measured yet: the zone for this view comes from task 2 |
-| `tools/label.html` | JS syntax-checked, **never opened with a real clip** |
-| `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** |
-| Case study `docs/case-study-tracking.md` | template; all real-footage numbers are `TBD` |
+| Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
+| Tracker bench: greedy_iou, groundplane, ByteTrack (Ultralytics), MOT bridge, TrackEval runner | tested; **boxmot adapter untested** (needs torch) |
+| Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken |
+| Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
+| Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
+| `tools/label.html` | used to draw the zone and label the clip |
+| `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** (task deferred) |
 
 ## Case studies
 
@@ -23,104 +23,65 @@ The repo's story is four field failures, each written up as its own case study u
 
 | Case study | Question | State |
 |---|---|---|
-| Counting accuracy | Why do zone visit counts drift when detection is accurate? | `docs/case-study-tracking.md`, in progress (tasks 7, 9) |
-| Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | not written; drill results exist (`make drill`, `make broker-restart`) |
-| Phantom boxes between vehicles side by side | Does the detector put a box in the gap between two vehicles, and does it get counted? | not started |
-| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | not started |
+| Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
+| Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
+| Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | next (task A) |
+| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | not started (task B) |
 
 ## Task queue, in order
 
-Each task lists the command and what "done" means. Do them in order; later ones depend on earlier ones.
+### A. Phantom boxes case study
+- The counting study found the first kind already: 18 of ByteTrack's 39 debounced enters on the MTID clip are tracks
+  that never moved, on the bike lane's white dashes inside the zone (`replay.score --explain`). ByteTrack keeps them
+  because it tracks boxes down to score 0.1; the harness trackers drop boxes under 0.3 (`min_score`).
+- Candidate fixes, each measured as its own step like `replay.ablation`: a track must move before it can enter
+  (zone logic, so a test in `harness/tests/` first), a higher score to start a track, a minimum box size, a mask of
+  static detections learned from the empty scene. Watch that a real vehicle stopped in the zone still counts.
+- Find the second kind (a box between two vehicles side by side) on a public CCTV-angled clip; log it in
+  `media/SOURCES.md`.
+- Done: `docs/case-study-phantoms.md` with a before/after table and the counting study's phantom paragraph pointing to it.
 
-### 1. Real clip in, video profile up
-- Owner supplies `media/sample.mp4` (Pexels 8564838 was shortlisted; verify the camera is static by
-  watching it once). Fill row 1 of `media/SOURCES.md`.
-- `make up-video`, then `make counts`. Fix whatever breaks in `services/edge` (likely: torch install
-  time, RTSP reconnect, zone polygon for this clip's pixel coordinates).
-- Done: `zone_events` rows arrive from `edge-01` and Grafana shows them.
-- Status: done. A handheld stock clip proved the plumbing; `media/sample.mp4` is now the fixed MTID intersection camera.
-  The edge still runs the default `ZONE_POLYGON` until task 2 draws the real zone; then set it in `docker-compose.yml`.
-  The dataset's own annotations for the same frames are kept in `media/candidates/mtid/annotations/` (not yet inspected).
+### B. Zone enter/exit balance case study
+- Starting point: the naive counter's net balance (enters minus exits) is 66 on ByteTrack, the debounced counter's 3
+  (`replay.cli`). Work out what a standing imbalance means per zone and how to reconcile it.
+- Done: `docs/case-study-balance.md` with measured figures and commands.
 
-### 2. Label the clip
-- Open `tools/label.html`, draw the zone over the stopping area, label at 2x, two passes.
-- Save `harness/zone.json` and `harness/truth.json` (both gitignored). Note pass-to-pass difference
-  in the case study; if it differs by more than 2, redraw the zone.
-- Done: both files exist and `expected_visits` is recorded in the case study.
-- Status: done. 14 visits; the two visual passes differ by 2 (14 vs 12), within the redraw threshold. The edge now uses
-  the same zone (`ZONE_POLYGON` in `docker-compose.yml`).
+### Deferred
+Not needed for the four case studies; kept in case a benchmark angle is wanted later.
+- boxmot adapter: `pip install boxmot`, fix `update()` columns, add `boxmot_bytetrack` and `boxmot_ocsort` rows.
+- UA-DETRAC sequence: a second, research-licensed dataset (metrics and citation only, no frames); multi-GB download.
+- Published tracker (FastTracker or UCMCTrack) through `replay.motformat` and `scripts/trackeval_run.py`.
 
-### 3. Detections and baseline
-```bash
-cd harness && pip install -e ".[video,viz]"
-python scripts/dump_detections.py --video ../media/sample.mp4 --per-class-nms --out runs/dets.jsonl
-python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json \
-    --trackers greedy_iou:max_age=5 greedy_iou groundplane
-```
-- If traffic is not left-to-right, track separately (compare's tracker spec splits on commas, so a list cannot go in it):
-  `python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lane_dir=[dx,dy]' --out runs/ground.jsonl`,
-  then pass `--tracks groundplane=runs/ground.jsonl` to `replay.compare`.
-- Done: the table is pasted into the case study "Baseline" and "Fixes" sections with the exact command.
-- Status: done. Baseline (naive and debounced counter on ByteTrack) and the tracker table are in the case study with their
-  commands. The per-step counter rows come from `python -m replay.ablation`.
-
-### 4. Real-footage visuals
-- Add a `--video` option to `replay/trackviz.py` (use the clip's frames as background instead of the
-  schematic road; `viz.py` already does this for stills, copy that approach).
-- Render `docs/footage/real-compare.gif` from the real detections (not `docs/img`, which holds fixture renders only).
-  Add to README under the headline result.
-- Done: GIF committed, generated by a Makefile target that reads `media/sample.mp4`.
-- Status: done. `make footage` renders `docs/footage/real-compare.gif` (trackviz `--video`, `--start`, `--seconds`); the
-  README shows it with the CC BY credit. Identity metrics against MTID-derived GT tracks (`scripts/mtid_to_gt.py`) are
-  in the case study too.
-
-### 5. boxmot adapter
-```bash
-pip install boxmot
-python -m replay.track --dets runs/dets.jsonl --tracker boxmot_bytetrack --out runs/bytetrack.jsonl
-```
-- Fix class names / `update()` signature against the installed boxmot version. Add one smoke test that
-  skips when boxmot is not installed.
-- Done: `boxmot_bytetrack` and `boxmot_ocsort` appear as rows in the compare table.
-
-### 6. UA-DETRAC sequence
-- Download one sequence with heavy occlusion. Follow `docs/datasets.md` steps 1 to 4.
-- Fix `detrac_to_gt.py` if the real XML differs from the documented format.
-- Done: a compare table with `id_switches` / `id_transfers` for greedy_iou, groundplane, bytetrack on
-  real ground truth. Metrics and citation in the case study; no frames.
-
-### 7. TrackEval
-- `python -m replay.motformat export-tracks` for each tracker, run TrackEval for HOTA / IDF1 on the
-  DETRAC sequence. Add columns to the case study table.
-- Done: HOTA and IDF1 reported with the TrackEval version and command.
-
-### 8. Published tracker through the MOT bridge
-- Clone FastTracker (github.com/Hamidreza-Hashempoor/FastTracker) or UCMCTrack
-  (github.com/corfyi/UCMCTrack). Run on the DETRAC sequence via `replay.motformat`. Check licence first.
-- Done: one more compare row, credited, with the exact commands in `docs/trackers.md`.
-
-### 9. Case study final pass
-- Every `TBD` replaced or the row deleted. "What did not work" section written. Limitations honest.
-- Done: `docs/case-study-tracking.md` reads end to end without placeholders.
-
-### 10. Repo polish (done)
-- About description, topics and social preview (a `trackers.gif` frame) are set on GitHub. The Grafana screenshot is in README, from `docs/screenshots/`.
+### Done
+1. Real clip in, video profile up: MTID intersection camera, `media/SOURCES.md`.
+2. Labelled the clip: `harness/zone.json`, `harness/truth.json` (gitignored); 14 visits from a two-of-three vote.
+3. Detections and baseline, with the per-step ablation (`replay.ablation`).
+4. Real-footage GIF (`make footage`) and identity metrics against MTID-derived tracks (`scripts/mtid_to_gt.py`).
+7. TrackEval on MTID (`scripts/trackeval_run.py`, TrackEval 12c8791 cloned to `.cache/`), not on DETRAC.
+9. Counting case study final pass: no placeholders; the per-class NMS baseline is kept, class-agnostic NMS is a later step.
+10. Repo polish: About, topics, social preview, Grafana screenshot.
 
 ## Known rough edges
-- The case study's baseline, ablation tables, first tracker table, the README's 78/39/21 and `real-compare.gif` use
-  per-class NMS detections (`--per-class-nms`, runs/dets.jsonl). The dump scripts and the edge now default to
-  class-agnostic NMS, measured in the case study's "Detector fix". Task 9: decide whether to re-baseline on it.
+- The counting study's baseline, ablation tables, first tracker table, the README's 78/39/21 and `real-compare.gif`
+  use per-class NMS detections (`--per-class-nms`, runs/dets.jsonl). The dump scripts and the edge default to
+  class-agnostic NMS.
+- The sim and the edge ignore `publish()`'s return code: when the bounded outgoing store (5000) is full, events past
+  the limit are dropped with no log line. Not reached in the drills.
+- Ingest does not count the duplicates its `ON CONFLICT` turns away, so redeliveries are not measured.
+- The harness's `id_switches` and TrackEval's IDSW differ by definition (greedy per-frame matching against CLEAR's
+  continuity-first matching); publish TrackEval's.
+- `scripts/trackeval_run.py` restores `np.int` / `np.float` / `np.bool` for TrackEval 12c8791; drop it once TrackEval
+  is fixed upstream.
 - The edge logs `Waiting for stream 0` whenever inference catches up with the RTSP stream. Log noise, not a stall.
 - `DebouncedZoneCounter.margin_px=10` was set against the synthetic ±6 px edge jitter in a 1280 px frame. On a real
   clip, check a parked vehicle's footpoint jitter and draw the zone so stops sit more than `margin_px` inside it.
 - `sim` service uses `SPEED=2`; Grafana FPS panel shows ~60. Not a bug.
-- `boxmot_adapter.py` guesses the `update()` return columns (x1,y1,x2,y2,id,conf,cls,det_index). Verify.
 - `groundplane` gate defaults (`gate_along=120`, `gate_across=40`) were tuned on the synthetic queue at
   10 fps and 1280 px wide. Real clips at 25 to 30 fps need smaller gates per frame.
 - `DebouncedZoneCounter.lost_ms=3000` closes a visit whose track went silent. On real footage with
   detector flicker inside the zone this may close a visit early and count the vehicle again when its track returns; watch `false_visits`.
 
 ## Kick-off prompt for Claude Code
-> Read CLAUDE.md and HANDOVER.md. Start at task 1. Run `make test` first and keep it green. Commit after
+> Read CLAUDE.md and HANDOVER.md. Start at the first open task. Run `make test` first and keep it green. Commit after
 > each task with a conventional prefix. Never write an unmeasured number into docs. Stop and ask me
 > before downloading anything larger than 500 MB or installing anything that needs a GPU.
