@@ -26,3 +26,13 @@ def test_finished_seeds_come_from_play_order_not_only_ground_truth():
     assert finished_seeds(truth={11, 12, 14}, seen={11, 12, 13, 14, 15}) == [11, 12, 13, 14]  # 13's truth lost, 15 running
     assert finished_seeds(truth={11, 12, 14, 15}, seen={11, 12, 14, 15, 16}) == [11, 12, 13, 14, 15]  # 13 lost outright
     assert finished_seeds(truth=set(), seen={11}) == []  # first scene still running
+
+
+def test_check_delivery_runs_without_the_package_installed():
+    # make drill runs `python scripts/check_delivery.py`; it must find replay/ without `pip install -e`
+    import subprocess
+    import sys
+    from pathlib import Path
+    script = Path(__file__).resolve().parent.parent / "scripts" / "check_delivery.py"
+    r = subprocess.run([sys.executable, "-S", str(script), "--help"], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr

@@ -16,7 +16,8 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from replay.delivery import expected_events, finished_seeds, reconcile
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from replay.delivery import expected_events, finished_seeds, reconcile  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 
