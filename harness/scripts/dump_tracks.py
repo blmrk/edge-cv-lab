@@ -2,6 +2,7 @@
 
 python scripts/dump_tracks.py --video ../media/sample.mp4 --tracker bytetrack.yaml --out runs/bytetrack.jsonl
 python scripts/dump_tracks.py --video ../media/sample.mp4 --tracker botsort.yaml   --out runs/botsort.jsonl
+NMS is class-agnostic, as in dump_detections.py.
 """
 import argparse
 import json
@@ -18,13 +19,17 @@ def main():
     ap.add_argument("--model", default="yolov8n.pt")
     ap.add_argument("--tracker", default="bytetrack.yaml")
     ap.add_argument("--classes", type=int, nargs="*", default=[2, 5, 7])  # COCO car, bus, truck
+    ap.add_argument("--per-class-nms", action="store_true",
+                    help="NMS within each class only, which keeps a car box and a truck box on one vehicle "
+                         "(Ultralytics' default; the case study's baseline figures used it)")
     a = ap.parse_args()
 
     fps = cv2.VideoCapture(a.video).get(cv2.CAP_PROP_FPS) or 30
     model = YOLO(a.model)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     with open(a.out, "w") as fh:
-        results = model.track(a.video, tracker=a.tracker, classes=a.classes, stream=True, verbose=False)
+        results = model.track(a.video, tracker=a.tracker, classes=a.classes,
+                              agnostic_nms=not a.per_class_nms, stream=True, verbose=False)
         for frame, r in enumerate(results):
             if r.boxes.id is None:
                 continue

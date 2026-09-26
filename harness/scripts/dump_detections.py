@@ -9,6 +9,7 @@ webcam indexes are numbered in read order at their own fps.
 Image frames are numbered from the file name (img00001.jpg -> frame 0), not by read order, so a frame
 that fails to load leaves a gap instead of shifting every later frame against the ground truth.
 conf defaults to 0.1 on purpose: ByteTrack-style trackers use low-score boxes to ride through occlusion.
+NMS is class-agnostic: one vehicle scored as both car and truck is one box, not two for a tracker to follow.
 """
 import argparse
 import json
@@ -30,6 +31,9 @@ def main():
     ap.add_argument("--model", default="yolov8n.pt")
     ap.add_argument("--conf", type=float, default=0.1)
     ap.add_argument("--classes", type=int, nargs="*", default=[2, 5, 7])  # COCO car, bus, truck
+    ap.add_argument("--per-class-nms", action="store_true",
+                    help="NMS within each class only, which keeps a car box and a truck box on one vehicle "
+                         "(Ultralytics' default; the case study's baseline figures used it)")
     a = ap.parse_args()
 
     if is_frame_source(a.video):
@@ -42,7 +46,9 @@ def main():
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     prev = None
     with open(a.out, "w") as fh:
-        for i, r in enumerate(model.predict(a.video, conf=a.conf, classes=a.classes, stream=True, verbose=False)):
+        results = model.predict(a.video, conf=a.conf, classes=a.classes, agnostic_nms=not a.per_class_nms,
+                                stream=True, verbose=False)
+        for i, r in enumerate(results):
             frame = frame_from_filename(r.path) if is_image(r.path) else i  # videos and streams: read order
             if frame is None:
                 raise SystemExit(f"{r.path}: file name does not end in a frame number (e.g. img00001.jpg)")

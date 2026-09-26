@@ -26,9 +26,14 @@ def _result(path):
         xyxy=_Tensor(b.xyxy[0]), conf=_Tensor(b.conf[0]), cls=_Tensor(b.cls[0])))
 
 
-def run(monkeypatch, tmp_path, source, paths, fps=None, video_fps=25.0):
-    """Runs main() as if ultralytics yielded one result per entry in `paths`; returns (frame, ts_ms) rows."""
-    model = types.SimpleNamespace(names={2: "car"}, predict=lambda *a, **k: iter(_result(p) for p in paths))
+def run(monkeypatch, tmp_path, source, paths, fps=None, video_fps=25.0, calls=None, extra=()):
+    """Runs main() as if ultralytics yielded one result per entry in `paths`; returns (frame, ts_ms) rows.
+    `calls` collects the keyword arguments each predict() call received."""
+    def predict(*_, **kw):
+        (calls if calls is not None else []).append(kw)
+        return iter(_result(p) for p in paths)
+
+    model = types.SimpleNamespace(names={2: "car"}, predict=predict)
     monkeypatch.setitem(sys.modules, "ultralytics", types.SimpleNamespace(YOLO=lambda *_: model))
     monkeypatch.setitem(sys.modules, "cv2", types.SimpleNamespace(
         CAP_PROP_FPS=5, VideoCapture=lambda *_: types.SimpleNamespace(get=lambda *_: video_fps)))
@@ -37,6 +42,7 @@ def run(monkeypatch, tmp_path, source, paths, fps=None, video_fps=25.0):
     spec.loader.exec_module(mod)
     out = tmp_path / "dets.jsonl"
     argv = ["dump_detections.py", "--video", str(source), "--out", str(out)] + (["--fps", str(fps)] if fps else [])
+    argv += list(extra)
     monkeypatch.setattr(sys, "argv", argv)
     mod.main()
     return [(d["frame"], d["ts_ms"]) for d in map(json.loads, out.read_text().splitlines())]
@@ -87,3 +93,28 @@ def test_image_name_without_a_number_exits(monkeypatch, tmp_path):
     d = frames_dir(tmp_path, "frame.jpg")
     with pytest.raises(SystemExit, match="frame number"):
         run(monkeypatch, tmp_path, d, [d / "frame.jpg"], fps=25)
+
+
+def test_nms_is_class_agnostic_unless_per_class_is_asked_for(monkeypatch, tmp_path):
+    # per-class NMS keeps a car box and a truck box on the same vehicle; class-agnostic NMS keeps the better one
+    (tmp_path / "clip.mp4").write_bytes(b"")
+    calls = []
+    run(monkeypatch, tmp_path, tmp_path / "clip.mp4", [], calls=calls)
+    run(monkeypatch, tmp_path, tmp_path / "clip.mp4", [], calls=calls, extra=["--per-class-nms"])
+    assert [c.get("agnostic_nms") for c in calls] == [True, False]
+
+
+def test_dump_tracks_nms_is_class_agnostic_unless_per_class_is_asked_for(monkeypatch, tmp_path):
+    calls = []
+    model = types.SimpleNamespace(names={2: "car"}, track=lambda *_, **kw: calls.append(kw) or iter(()))
+    monkeypatch.setitem(sys.modules, "ultralytics", types.SimpleNamespace(YOLO=lambda *_: model))
+    monkeypatch.setitem(sys.modules, "cv2", types.SimpleNamespace(
+        CAP_PROP_FPS=5, VideoCapture=lambda *_: types.SimpleNamespace(get=lambda *_: 30.0)))
+    spec = importlib.util.spec_from_file_location("dump_tracks", SCRIPT.parent / "dump_tracks.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for extra in ([], ["--per-class-nms"]):
+        monkeypatch.setattr(sys, "argv", ["dump_tracks.py", "--video", "clip.mp4", "--out", str(tmp_path / "t.jsonl"),
+                                          *extra])
+        mod.main()
+    assert [c.get("agnostic_nms") for c in calls] == [True, False]
