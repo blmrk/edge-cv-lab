@@ -81,6 +81,26 @@ def test_default_gap_splits_on_any_unannotated_frame(tmp_path):
     assert stats["gaps"] == [1, 33]
 
 
+def test_reuse_with_no_gap_is_split_on_an_impossible_jump(tmp_path):
+    # Object ID 300: one vehicle at MTID frames 1-2, a different one far away from frame 3 on, no gap between.
+    rows = [_row(f, 300, "Car", _rect(100 + 2 * f, 300)) for f in (1, 2)]
+    rows += [_row(f, 300, "Car", _rect(700 + 2 * f, 50)) for f in (3, 4)]
+    tracks, stats = m2g.convert(_write(tmp_path / "Infrastructure", {"0": rows}), max_jump_px=85)
+    ids = _ids_by_frame(tracks, "car")
+    assert ids[0] == ids[1] != ids[2] == ids[3]
+    assert (stats["gap_splits"], stats["jump_splits"]) == (0, 1)
+
+
+def test_jump_limit_is_per_frame_elapsed(tmp_path):
+    # With a gap allowed, a vehicle back after 3 unannotated frames may have moved 4 frames' worth.
+    slow = [_row(1, 400, "Car", _rect(100, 300)), _row(5, 400, "Car", _rect(100 + 4 * 60, 300))]
+    fast = [_row(1, 401, "Van", _rect(100, 100)), _row(5, 401, "Van", _rect(100 + 4 * 110, 100))]
+    tracks, stats = m2g.convert(_write(tmp_path / "Infrastructure", {"0": slow + fast}), gap_frames=5, max_jump_px=85)
+    assert len(set(_ids_by_frame(tracks, "car").values())) == 1  # 60 px/frame: kept
+    assert len(set(_ids_by_frame(tracks, "van").values())) == 2  # 110 px/frame: split
+    assert (stats["kept_max_px_per_frame"], stats["split_min_px_per_frame"]) == (60.0, 110.0)
+
+
 def test_identities_are_unique_across_object_ids_and_output_sorted(tmp_path):
     tracks, _ = _convert(tmp_path)
     assert [(t.frame, t.track_id) for t in tracks] == sorted((t.frame, t.track_id) for t in tracks)
@@ -120,3 +140,4 @@ def test_main_writes_gt_jsonl_and_prints_stats(tmp_path, monkeypatch, capsys):
     assert "8 boxes, 3 identities" in printed
     assert "1 of 3 Object IDs reused" in printed
     assert "3 cyclist boxes excluded" in printed
+    assert "0 on a footpoint jump over 85 px/frame" in printed

@@ -1,7 +1,7 @@
 """MTID infrastructure-camera annotations -> harness ground truth.
 
 python scripts/mtid_to_gt.py --annotations ../media/candidates/mtid/annotations/Infrastructure --out runs/mtid \
-    [--fps 30] [--gap-frames 0] [--exclude Cyclist]
+    [--fps 30] [--gap-frames 0] [--max-jump-px 85] [--exclude Cyclist]
 
 Writes <out>.gt.jsonl: ground-truth tracks in the harness TrackBox schema (for --gt in replay.compare).
 
@@ -23,6 +23,12 @@ first appearance. The default gap comes from the real annotations (run this scri
   - each of those 53 is a different vehicle: the box comes back at another place in the image, not where it left.
 So any gap means reuse, and the default splits on any unannotated frame (0). A larger value only helps footage
 where a visible vehicle is left unannotated for a few frames.
+
+Some IDs are reused with no gap at all (mostly where one annotation batch hands over to the next), which no gap
+setting can split. So an Object ID also starts a new identity when its footpoint (bottom-centre of the box) moves
+more than --max-jump-px per frame elapsed. The script prints the fastest step it kept and the slowest it split;
+on the real annotations with the defaults those are 65.5 px/frame (a bus whose box widens as it enters the frame)
+and 104.6 px/frame, over 6 jump splits. The default, 85, sits about halfway between the two.
 Licence: MTID is CC BY 4.0 (see media/SOURCES.md). The annotations are not committed.
 """
 from __future__ import annotations
@@ -40,6 +46,7 @@ from replay.schema import TrackBox  # noqa: E402
 
 FPS = 30
 GAP_FRAMES = 0
+MAX_JUMP_PX = 85.0
 EXCLUDE = ("Cyclist",)
 _FRAME = re.compile(r"(\d+)\.\w+$")
 
@@ -79,7 +86,13 @@ def read_rows(root: Path) -> list[_Row]:
     return rows
 
 
-def split_identities(rows: list[_Row], gap_frames: int = GAP_FRAMES):
+def _speed(a: _Row, b: _Row) -> float:
+    """Footpoint (bottom-centre) displacement per frame elapsed, in px."""
+    (ax, ay), (bx, by) = ((a.bbox[0] + a.bbox[2]) / 2, a.bbox[3]), ((b.bbox[0] + b.bbox[2]) / 2, b.bbox[3])
+    return ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5 / (b.frame - a.frame)
+
+
+def split_identities(rows: list[_Row], gap_frames: int = GAP_FRAMES, max_jump_px: float = MAX_JUMP_PX):
     """Cut each Object ID's rows into one segment per vehicle."""
     by_id: dict[int, list[_Row]] = defaultdict(list)
     for r in rows:
@@ -87,7 +100,8 @@ def split_identities(rows: list[_Row], gap_frames: int = GAP_FRAMES):
     segments: list[list[_Row]] = []
     gaps: list[int] = []
     reused: set[int] = set()
-    gap_splits = 0
+    gap_splits = jump_splits = 0
+    kept_max, split_min = 0.0, None
     for oid, rs in by_id.items():
         rs.sort(key=lambda r: r.frame)
         seg = [rs[0]]
@@ -96,19 +110,30 @@ def split_identities(rows: list[_Row], gap_frames: int = GAP_FRAMES):
             if gap:
                 gaps.append(gap)
             if gap > gap_frames:
-                segments.append(seg)
-                seg = []
                 gap_splits += 1
-                reused.add(oid)
-            seg.append(b)
+            else:
+                v = _speed(a, b)
+                if v <= max_jump_px:
+                    kept_max = max(kept_max, v)
+                    seg.append(b)
+                    continue
+                jump_splits += 1
+                split_min = v if split_min is None else min(split_min, v)
+            segments.append(seg)
+            seg = [b]
+            reused.add(oid)
         segments.append(seg)
-    stats = {"object_ids": len(by_id), "reused_ids": len(reused), "gap_splits": gap_splits, "gaps": sorted(gaps)}
+    stats = {"object_ids": len(by_id), "reused_ids": len(reused), "gap_splits": gap_splits,
+             "jump_splits": jump_splits, "gaps": sorted(gaps),
+             "kept_max_px_per_frame": round(kept_max, 1),
+             "split_min_px_per_frame": None if split_min is None else round(split_min, 1)}
     return segments, stats
 
 
-def convert(root: Path, fps: float = FPS, gap_frames: int = GAP_FRAMES, exclude=EXCLUDE):
+def convert(root: Path, fps: float = FPS, gap_frames: int = GAP_FRAMES, exclude=EXCLUDE,
+            max_jump_px: float = MAX_JUMP_PX):
     rows = read_rows(root)
-    segments, stats = split_identities(rows, gap_frames)
+    segments, stats = split_identities(rows, gap_frames, max_jump_px)
     frames = {r.frame for r in rows}
     stats["unannotated_frames"] = (max(frames) - min(frames) + 1 - len(frames)) if frames else 0
     stats["frame_range"] = (min(frames) + 1, max(frames) + 1) if frames else (0, 0)  # MTID numbering
@@ -128,10 +153,12 @@ def main():
     ap.add_argument("--fps", type=float, default=FPS)
     ap.add_argument("--gap-frames", type=int, default=GAP_FRAMES,
                     help="an Object ID back after more unannotated frames than this is a new vehicle")
+    ap.add_argument("--max-jump-px", type=float, default=MAX_JUMP_PX,
+                    help="an Object ID whose footpoint moves faster than this (px per frame) is a new vehicle")
     ap.add_argument("--exclude", nargs="*", default=list(EXCLUDE), help="annotation tags to leave out")
     a = ap.parse_args()
 
-    tracks, s = convert(Path(a.annotations), a.fps, a.gap_frames, tuple(a.exclude))
+    tracks, s = convert(Path(a.annotations), a.fps, a.gap_frames, tuple(a.exclude), a.max_jump_px)
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(f"{out}.gt.jsonl", "w") as fh:
@@ -141,8 +168,12 @@ def main():
     n_ids = len({t.track_id for t in tracks})
     left_out = "/".join(x.lower() for x in a.exclude) or "no"
     print(f"{out}.gt.jsonl: {len(tracks)} boxes, {n_ids} identities, {s['excluded_boxes']} {left_out} boxes excluded")
-    print(f"{s['reused_ids']} of {s['object_ids']} Object IDs reused: {s['gap_splits']} reappearances split "
-          f"after more than {a.gap_frames} unannotated frames")
+    print(f"{s['reused_ids']} of {s['object_ids']} Object IDs reused, split {s['gap_splits'] + s['jump_splits']} "
+          f"times: {s['gap_splits']} after more than {a.gap_frames} unannotated frames, "
+          f"{s['jump_splits']} on a footpoint jump over {a.max_jump_px:g} px/frame")
+    slowest = s["split_min_px_per_frame"]
+    print(f"footpoint speed within an Object ID: fastest kept {s['kept_max_px_per_frame']} px/frame, "
+          + (f"slowest split {slowest} px/frame" if slowest is not None else "none split on a jump"))
     g = s["gaps"]
     print(f"gaps within an Object ID: {len(g)}" + (f" (shortest {g[0]}, longest {g[-1]} frames)" if g else "")
           + f"; MTID frames {s['frame_range'][0]}-{s['frame_range'][1]} with no annotation at all: "
