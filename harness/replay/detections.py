@@ -8,6 +8,7 @@ sees exactly the same boxes, and the detector (the slow part) runs once.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import defaultdict
 from dataclasses import dataclass
@@ -66,6 +67,21 @@ def frame_from_filename(path: str | Path) -> int | None:
     detections aligned with ground truth when a frame in the middle is unreadable and skipped."""
     m = re.search(r"(\d+)$", Path(path).stem)
     return int(m.group(1)) - 1 if m else None
+
+
+def frame_window(first: int, last: int, fps: float, start: float = 0.0,
+                 seconds: float | None = None) -> tuple[int, int]:
+    """Inclusive frame range for a time window of a clip, frame f shown at f / fps seconds.
+    Frames at or after `start`, before `start + seconds` (to the end if `seconds` is None),
+    clamped to [first, last]. Raises ValueError for a negative or empty window."""
+    if start < 0 or (seconds is not None and seconds <= 0):
+        raise ValueError(f"bad window: start {start} s, length {seconds} s")
+    eps = 1e-6                                              # 0.1 * 30 is 3.0000000000000004, still frame 3
+    lo = max(first, math.ceil(start * fps - eps))
+    hi = last if seconds is None else min(last, math.ceil((start + seconds) * fps - eps) - 1)
+    if lo > hi:
+        raise ValueError(f"window {start} s + {seconds} s holds no frame of {first}..{last} at {fps} fps")
+    return lo, hi
 
 
 def frames(dets: list[Detection]) -> Iterator[tuple[int, int, list[Detection]]]:

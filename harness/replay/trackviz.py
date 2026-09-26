@@ -6,6 +6,10 @@ dwell timer of any visit still open, so a merged visit is visible as a timer tha
 
 python -m replay.trackviz --dets fixtures/queue.dets.jsonl --gt fixtures/queue.gt.jsonl --zone fixtures/zone.json \
     --trackers "greedy_iou:max_age=5" greedy_iou groundplane --occluder 440 560 --out ../docs/img/trackers.gif
+
+Over real footage: --video draws each frame on the matching frame of the clip the detections came from (frame f is
+the (f+1)-th frame read, as dump_detections numbers them), and --start/--seconds render a window of it. Trackers
+still run from the first frame, so IDs match a full run; the strip counters start at the window.
 """
 from __future__ import annotations
 
@@ -16,12 +20,52 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
-from .detections import frames, read_detections
+from .detections import frame_window, frames, read_detections
 from .schema import read_tracks
 from .trackers import create
 from .viz import BG, FONT, LINE, ROAD, TEXT, ZONE_C, _palette, draw_zone
 
 W = 1280
+
+
+class _Clip:
+    """A video's frames in read order, fetched forward only."""
+
+    def __init__(self, path: str):
+        self.path, self.cap, self.pos = path, cv2.VideoCapture(path), 0
+        if not self.cap.isOpened():
+            raise SystemExit(f"cannot open {path}")
+
+    def frame(self, f: int) -> np.ndarray:
+        if f < self.pos:
+            raise ValueError(f"frame {f} already passed ({self.pos})")
+        while self.pos < f:                                           # grab skips decoding the frames not drawn
+            if not self.cap.grab():
+                raise SystemExit(f"{self.path} ends before frame {f}")
+            self.pos += 1
+        ok, img = self.cap.read()
+        if not ok:
+            raise SystemExit(f"{self.path} ends before frame {f}")
+        self.pos += 1
+        return img
+
+
+def save_fixed_camera_gif(images: list[np.ndarray], out: str, fps: int, hold: int = 20, colors: int = 128):
+    """GIF of footage from a fixed camera, a fraction of the size of a plain GIF. A pixel that changed by less than
+    `hold` levels since it was last drawn keeps its drawn value (sensor and codec noise), and every frame shares one
+    palette, so the static background repeats exactly and Pillow writes it as transparent runs."""
+    from PIL import Image
+
+    held, frames = images[0].astype(np.int16), []
+    for img in images:
+        cur = img.astype(np.int16)
+        moved = np.abs(cur - held).max(axis=2) >= hold
+        held[moved] = cur[moved]
+        frames.append(held.astype(np.uint8))
+    sample = np.concatenate(frames[:: max(1, len(frames) // 8)], axis=0)
+    palette = Image.fromarray(sample).quantize(colors, method=Image.Quantize.MEDIANCUT)
+    gif = [Image.fromarray(f).quantize(palette=palette, dither=Image.Dither.NONE) for f in frames]
+    gif[0].save(out, save_all=True, append_images=gif[1:], duration=round(1000 / fps), loop=0, optimize=True)
 
 
 def main():
@@ -35,7 +79,11 @@ def main():
     ap.add_argument("--trackers", nargs="+", required=True, help='"name" or "name:key=json,key=json"')
     ap.add_argument("--labels", nargs="*", help="display names, same order as --trackers")
     ap.add_argument("--occluder", nargs=2, type=int, metavar=("X1", "X2"))
-    ap.add_argument("--crop", nargs=2, type=int, default=[230, 520], metavar=("Y1", "Y2"))
+    ap.add_argument("--crop", nargs=2, type=int, metavar=("Y1", "Y2"),
+                    help="rows kept per strip (default 230 520, or the whole frame with --video)")
+    ap.add_argument("--video", help="draw over this clip's frames instead of the schematic road")
+    ap.add_argument("--start", type=float, default=0.0, help="first second of the clip to render")
+    ap.add_argument("--seconds", type=float, help="seconds to render from --start (default: to the end)")
     ap.add_argument("--every", type=int, default=2, help="render every Nth frame")
     ap.add_argument("--fps", type=int, default=12)
     ap.add_argument("--width", type=int, default=960)
@@ -56,28 +104,47 @@ def main():
         runs.append({"label": (a.labels or a.trackers)[i], "tracker": create(name, **params),
                      "counter": DebouncedZoneCounter(poly), "ids": set(), "closed": 0})
 
-    y1, y2 = a.crop
+    stamps = {d.frame: d.ts_ms for d in dets}
+    first, last = min(stamps), max(stamps)
+    fps = 1000 * (last - first) / max(stamps[last] - stamps[first], 1)
+    try:
+        f0, f1 = frame_window(first, last, fps, a.start, a.seconds)
+    except ValueError as exc:
+        ap.error(str(exc))
+    clip = _Clip(a.video) if a.video else None
+    y1, y2 = a.crop or ([0, 10**6] if clip else [230, 520])
     images = []
-    last = max(d.frame for d in dets)
     for f, ts, ds in frames(dets):
+        if f > f1:
+            break
         strips = []
+        shown = f >= f0 and not (f % a.every and f != f1)
+        bg = clip.frame(f) if clip and shown else None
         for r in runs:
             boxes = r["tracker"].update(f, ts, ds)
             for b in boxes:
-                r["ids"].add(b.track_id)
-                r["closed"] += sum(1 for e in r["counter"].update(b) if e.kind == "exit")
+                exits = sum(1 for e in r["counter"].update(b) if e.kind == "exit")
+                if f >= f0:                                           # counters start at the window
+                    r["ids"].add(b.track_id)
+                    r["closed"] += exits
             if f == last:                                             # end of stream: close what is still open
                 r["closed"] += sum(1 for e in r["counter"].expire(ts + 10**9) if e.kind == "exit")
-            if f % a.every and f != last:
+            if not shown:
                 continue
-            img = np.full((720, W, 3), BG, np.uint8)
-            cv2.rectangle(img, (0, 330), (W, 470), ROAD, -1)
-            for x in range(0, W, 80):
-                cv2.line(img, (x, 400), (x + 40, 400), LINE, 2)
+            if bg is not None:
+                img = bg.copy()
+            else:
+                img = np.full((720, W, 3), BG, np.uint8)
+                cv2.rectangle(img, (0, 330), (W, 470), ROAD, -1)
+                for x in range(0, W, 80):
+                    cv2.line(img, (x, 400), (x + 40, 400), LINE, 2)
             draw_zone(img, poly)
             for g in gt.get(f, []):                                   # the real vehicles
                 gx1, gy1, gx2, gy2 = map(int, g.bbox)
-                cv2.rectangle(img, (gx1 + 4, gy1 + 10), (gx2 - 4, gy2), (95, 95, 95), -1)
+                if bg is not None:                                    # footage shows the vehicle: outline only
+                    cv2.rectangle(img, (gx1, gy1), (gx2, gy2), (200, 200, 200), 1)
+                else:
+                    cv2.rectangle(img, (gx1 + 4, gy1 + 10), (gx2 - 4, gy2), (95, 95, 95), -1)
             if a.occluder:                                            # drawn over the vehicles
                 cv2.rectangle(img, (a.occluder[0], 300), (a.occluder[1], 500), (70, 74, 82), -1)
                 cv2.putText(img, "pillar", (a.occluder[0] + 22, 292), FONT, 0.6, (150, 150, 150), 1, cv2.LINE_AA)
@@ -85,9 +152,20 @@ def main():
                 bx1, by1, bx2, by2 = map(int, b.bbox)
                 c = _palette(b.track_id)
                 cv2.rectangle(img, (bx1, by1), (bx2, by2), c, 3)
-                cv2.putText(img, f"#{b.track_id}", (bx1, by1 - 8), FONT, 0.8, c, 2, cv2.LINE_AA)
+                if bg is None:
+                    cv2.putText(img, f"#{b.track_id}", (bx1, by1 - 8), FONT, 0.8, c, 2, cv2.LINE_AA)
+                    continue
+                (tw, th), _ = cv2.getTextSize(f"#{b.track_id}", FONT, 0.9, 2)   # footage: filled tag, readable
+                ty = max(by1, y1 + int(40 * img.shape[1] / W) + th + 10)       # on any background, below the header
+                cv2.rectangle(img, (bx1, ty - th - 10), (bx1 + tw + 8, ty), c, -1)
+                cv2.putText(img, f"#{b.track_id}", (bx1 + 4, ty - 5), FONT, 0.9, (0, 0, 0), 2, cv2.LINE_AA)
 
             strip = img[y1:y2].copy()
+            if strip.shape[1] != W:                                   # e.g. a 1024 px clip: same header layout
+                strip = cv2.resize(strip, (W, round(strip.shape[0] * W / strip.shape[1])))
+            if bg is not None:
+                cv2.putText(strip, f"{ts / 1000:5.1f} s", (W - 130, strip.shape[0] - 16), FONT, 0.8, TEXT, 2,
+                            cv2.LINE_AA)
             cv2.rectangle(strip, (0, 0), (W, 40), (0, 0, 0), -1)
             cv2.putText(strip, r["label"], (16, 28), FONT, 0.8, TEXT, 2, cv2.LINE_AA)
             stats = f"IDs used {len(r['ids'])}    visits closed {r['closed']}"
@@ -102,7 +180,10 @@ def main():
             images.append(cv2.cvtColor(cv2.resize(frame, (a.width, h), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB))
 
     images += [images[-1]] * (a.fps * 2)                              # hold the final frame
-    imageio.mimsave(a.out, images, duration=1 / a.fps, loop=0)
+    if clip:
+        save_fixed_camera_gif(images, a.out, a.fps)
+    else:
+        imageio.mimsave(a.out, images, duration=1 / a.fps, loop=0)
     for r in runs:
         print(f"{r['label']}: IDs {len(r['ids'])}, visits closed {r['closed']}")
     print("wrote", a.out, f"({len(images)} frames)")
