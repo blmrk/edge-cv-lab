@@ -9,3 +9,4 @@ harness/truth.json
 !media/SOURCES.md
 *.pt
 .env
+.cache/

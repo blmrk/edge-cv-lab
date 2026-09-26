@@ -4,6 +4,7 @@
   2. run FastTracker / UCMCTrack / TrackTrack on seq/ following their README
   3. python -m replay.motformat import-tracks --mot results/seq.txt --dets runs/dets.jsonl --out runs/fasttracker.jsonl
   4. (optional) python -m replay.motformat export-tracks --tracks runs/x.jsonl --out trackeval/x.txt   -> TrackEval
+     (scripts/trackeval_run.py does steps 4 and export-gt for you and prints HOTA / IDF1)
 
 MOT rows: frame, id, left, top, width, height, conf, x, y, z   (frame is 1-based)
 """
@@ -29,6 +30,14 @@ def export_tracks(tracks, path):
         for t in tracks:
             x1, y1, x2, y2 = t.bbox
             fh.write(f"{t.frame + 1},{t.track_id},{x1:.2f},{y1:.2f},{x2 - x1:.2f},{y2 - y1:.2f},{t.score:.4f},-1,-1,-1\n")
+
+
+def export_gt(tracks, path):
+    """Ground-truth tracks as MOTChallenge gt.txt: consider flag 1, class 1, visibility 1 on every row."""
+    with open(path, "w") as fh:
+        for t in tracks:
+            x1, y1, x2, y2 = t.bbox
+            fh.write(f"{t.frame + 1},{t.track_id},{x1:.2f},{y1:.2f},{x2 - x1:.2f},{y2 - y1:.2f},1,1,1\n")
 
 
 def import_tracks(path, ts_by_frame: dict[int, int]) -> list[TrackBox]:
@@ -57,13 +66,15 @@ def write_tracks(tracks, path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["export-dets", "import-tracks", "export-tracks"])
+    ap.add_argument("cmd", choices=["export-dets", "import-tracks", "export-tracks", "export-gt"])
     ap.add_argument("--dets"); ap.add_argument("--tracks"); ap.add_argument("--mot"); ap.add_argument("--out", required=True)
     a = ap.parse_args()
     if a.cmd == "export-dets":
         export_dets(read_detections(a.dets), a.out)
     elif a.cmd == "export-tracks":
         export_tracks(list(read_tracks(a.tracks)), a.out)
+    elif a.cmd == "export-gt":
+        export_gt(list(read_tracks(a.tracks)), a.out)
     else:
         from .detections import frames
         ts = {f: t for f, t, _ in frames(read_detections(a.dets))}
