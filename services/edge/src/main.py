@@ -33,7 +33,8 @@ def main():
     client, counter, model = mqtt_client(), DebouncedZoneCounter(ZONE), YOLO(os.environ.get("MODEL", "yolov8n.pt"))
     frames, last_hb = 0, time.monotonic()
     for r in model.track(RTSP, tracker=os.environ.get("TRACKER", "bytetrack.yaml"),
-                         classes=[2, 5, 7], stream=True, verbose=False):
+                         classes=[2, 5, 7], agnostic_nms=True,  # one box per vehicle, not a car and a truck
+                         stream=True, verbose=False):
         frames += 1
         ts_ms = time.time_ns() // 1_000_000  # integer ms, UTC
         if r.boxes.id is not None:
