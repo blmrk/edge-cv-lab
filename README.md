@@ -57,7 +57,7 @@ Every image in `docs/img` is generated from checked-in fixtures: `pip install -e
 
 ### On real footage
 
-A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone: the extra visits are the tracker splitting one vehicle into several IDs.
+A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone: the extra visits are the tracker splitting one vehicle into several IDs. Those runs use the detector's default per-class NMS, which can leave a car box and a truck box on one vehicle; with class-agnostic NMS, ID switches against the dataset's annotated tracks fall from 110 to 11 for ByteTrack and from 368 to 68 for the short-buffer IoU tracker, while visit counts move less.
 
 ![two IoU trackers over the real clip, IDs as coloured tags](docs/footage/real-compare.gif)
 
