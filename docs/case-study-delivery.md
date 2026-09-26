@@ -45,8 +45,10 @@ keeps a QoS 1 message in a bounded outgoing store (5000 messages here) until the
 after a reconnect; a QoS 0 message is sent once and not kept (paho-mqtt 2.1.0, `Client.publish`).
 
 The broker restart loses events even though the device publishes at QoS 1 throughout. The only switch between the two
-runs is durable sessions, so the loss is between the broker and the consumer: without them, ingest's session and the
-messages queued for it live in broker memory, and the restart drops them. With durable sessions EMQX keeps both on disk.
+runs is durable sessions, so the loss is between the broker and the consumer. Without them ingest's session lives in
+broker memory, subscription included: the restart drops what was queued for ingest, and events published afterwards go
+to no subscriber until ingest reconnects and subscribes again. With durable sessions EMQX keeps the session and its
+messages on disk.
 
 Delivery lag of naive events in the fixed uplink drill:
 
@@ -57,8 +59,9 @@ Delivery lag of naive events in the fixed uplink drill:
 | latency | 143 | 0.86 s | 3.57 s |
 | after the outage | 700 | 26.14 s | 120.05 s |
 
-The outage turns into lag instead of loss: its events arrive once the link is back, the oldest 120.05 s late, the length
-of the outage. In the QoS 0 run the window after the outage receives 272 naive events against 700, with a median lag of
+The outage turns into lag instead of loss: its events arrive once the device reconnects, the oldest 120.05 s late. That
+is the outage plus the wait for the device's next reconnect attempt: the backoff doubles from 1 s up to 60 s, so the
+catch-up can start up to a minute after the link returns. In the QoS 0 run the window after the outage receives 272 naive events against 700, with a median lag of
 0.11 s: there is no backlog because nothing was kept. Anything that buckets events by arrival time puts the backlog in
 the wrong minute; dashboards and counts should use the event's own timestamp. The Grafana screenshot in the README
 shows the flatline and the catch-up during an outage.
@@ -88,6 +91,10 @@ runs show that no duplicate got through, not how many redeliveries happened.
 - The outgoing store was not filled in these runs. When it is full, `publish` returns `MQTT_ERR_QUEUE_SIZE`, and neither
   the sim nor the edge checks the return code, so events past the limit would be dropped without a log line.
 - Duplicate protection is shown only by its result (no duplicate stored), not by a count of redeliveries.
+- The reconnect backoff trades broker load for catch-up delay: after a long outage the device may wait up to 60 s past
+  the link's return before it reconnects.
+- The lab's own Grafana count panels bucket by arrival time (`received_at`); that is what shows the outage as a
+  flatline and a catch-up spike. Counts per minute by event time would need `ts_ms`.
 
 ## Reproduce
 
