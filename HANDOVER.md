@@ -17,6 +17,17 @@ Last updated 2026-09-25. Everything below has been run unless marked otherwise.
 | `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** |
 | Case study `docs/case-study-tracking.md` | template; all real-footage numbers are `TBD` |
 
+## Case studies
+
+The repo's story is four field failures, each written up as its own case study under `docs/`:
+
+| Case study | Question | State |
+|---|---|---|
+| Counting accuracy | Why do zone visit counts drift when detection is accurate? | `docs/case-study-tracking.md`, in progress (tasks 7, 9) |
+| Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | not written; drill results exist (`make drill`, `make broker-restart`) |
+| Phantom boxes between vehicles side by side | Does the detector put a box in the gap between two vehicles, and does it get counted? | not started |
+| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | not started |
+
 ## Task queue, in order
 
 Each task lists the command and what "done" means. Do them in order; later ones depend on earlier ones.
