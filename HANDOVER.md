@@ -96,9 +96,6 @@ python -m replay.track --dets runs/dets.jsonl --tracker boxmot_bytetrack --out r
 - About description, topics and social preview (a `trackers.gif` frame) are set on GitHub. The Grafana screenshot is in README, from `docs/screenshots/`.
 
 ## Known rough edges
-- `scripts/dump_detections.py` runs non-maximum suppression per class, so one vehicle can keep both a car and a truck
-  box and a tracker then follows both. Class-agnostic NMS would remove the duplicates; it changes every detection-based
-  number in the case study, so re-run Reproduce after it.
 - The edge logs `Waiting for stream 0` whenever inference catches up with the RTSP stream. Log noise, not a stall.
 - `DebouncedZoneCounter.margin_px=10` was set against the synthetic ±6 px edge jitter in a 1280 px frame. On a real
   clip, check a parked vehicle's footpoint jitter and draw the zone so stops sit more than `margin_px` inside it.
