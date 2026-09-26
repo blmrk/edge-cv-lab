@@ -86,8 +86,24 @@ def test_explain_separates_a_parked_phantom_from_a_moving_vehicle():
     dash = [TrackBox(f, f * 100, 2, (280, 280, 320, 300), 0.2) for f in range(200, 241)]  # never moves, inside
     boxes = sorted(car + dash, key=lambda b: (b.frame, b.track_id))
 
-    rows = explain(boxes, square, truth_ms=[1100], tol_ms=2000)
+    rows, summary = explain(boxes, square, truth_ms=[1100], tol_ms=2000)
 
-    assert [(r["track_id"], r["matched"]) for r in rows] == [(1, True), (2, False)]
-    assert rows[0]["travel_px"] == 590.0 and rows[1]["travel_px"] == 0.0
+    assert [(r["track_id"], r["travel_px"]) for r in rows] == [(1, 590.0), (2, 0.0)]
     assert (rows[1]["w"], rows[1]["h"], rows[1]["score"]) == (40.0, 20.0, 0.2)
+    assert (summary["static"], summary["moving"]) == (1, 1)
+    assert summary["moving_vs_labels"]["matched"] == 1
+
+
+def test_explain_scores_moving_enters_alone_so_a_phantom_cannot_take_a_label():
+    # the phantom enters first, within 2 s of the car's label: time-order matching would hand it the label
+    from replay.schema import TrackBox
+    from replay.score import explain, match
+    square = [(100, 100), (500, 100), (500, 500), (100, 500)]
+    dash = [TrackBox(f, f * 100, 2, (280, 280, 320, 300), 0.2) for f in range(0, 40)]
+    car = [TrackBox(f, f * 100, 1, (10 * (f - 5) - 20, 260, 10 * (f - 5) + 20, 300)) for f in range(5, 65)]
+    boxes = sorted(car + dash, key=lambda b: (b.frame, b.track_id))
+    rows, summary = explain(boxes, square, truth_ms=[1600], tol_ms=2000)
+
+    assert match([r["ts_ms"] for r in rows], [1600], 2000)["matched"] == 1  # one of the two enters takes the label
+    assert summary["moving_vs_labels"] == match([r["ts_ms"] for r in rows if r["track_id"] == 1], [1600], 2000)
+    assert (summary["moving_vs_labels"]["matched"], summary["moving_vs_labels"]["false_visits"]) == (1, 0)
