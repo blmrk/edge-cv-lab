@@ -78,7 +78,7 @@ services:
     image: grafana/grafana-oss:11.2.0
     depends_on: [postgres]
     restart: unless-stopped
-    ports: ["3000:3000"]
+    ports: ["${GRAFANA_PORT:-3000}:3000"]  # GRAFANA_PORT=3001 make up when 3000 is taken
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer

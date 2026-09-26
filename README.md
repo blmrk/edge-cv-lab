@@ -83,7 +83,7 @@ make up              # synthetic traffic -> throttled uplink -> MQTT -> Postgres
 make counts          # enter/exit totals per counter
 ```
 
-Grafana: http://localhost:3000 (no login; admin / lab to edit). EMQX: http://localhost:18083 (admin / public).
+Grafana: http://localhost:3000 (no login; admin / lab to edit; `GRAFANA_PORT=3001 make up` if 3000 is taken). EMQX: http://localhost:18083 (admin / public).
 
 **Full lab with real video:**
 
