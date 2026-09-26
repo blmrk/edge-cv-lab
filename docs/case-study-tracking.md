@@ -41,14 +41,35 @@ Add a GIF of the worst offender here. One clip of a box flickering on a boundary
 | Change | Enter error | Notes |
 |---|---|---|
 | Baseline | +457.1% (78 vs 14) | naive centroid counter on ByteTrack tracks |
-| + footpoint anchor | TBD | |
-| + hysteresis (5 in / 8 out) | TBD | |
-| + edge margin (10 px) | TBD | parked on the zone edge |
-| + min dwell 1 s, cooldown 1.5 s | TBD | |
-| All counter fixes together (debounced footpoint) | +178.6% (39 vs 14) | same ByteTrack tracks; per-step rows above still need an ablation run |
+| + footpoint anchor | +600.0% (98) | worse on this view (see What did not work) |
+| + hysteresis (5 in / 8 out) | +392.9% (69) | |
+| + edge margin (10 px) | +364.3% (65) | parked on the zone edge |
+| + min dwell 1 s, cooldown 1.5 s | +178.6% (39) | largest single step: fragment tracks shorter than a second no longer count |
 | + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | table below | best here: `greedy_iou:max_age=5`, 21 vs 14 |
 
 Report each step separately. An ablation is more convincing than one before/after pair.
+
+The counter rows above are ByteTrack tracks, steps added cumulatively (`replay.ablation`, command in Reproduce):
+
+| step | enters | enter error pct | matched | false visits | missed visits | f1 |
+|---|---|---|---|---|---|---|
+| baseline (naive, centroid) | 78 | +457.1% | 13 | 65 | 1 | 0.283 |
+| + footpoint anchor | 98 | +600.0% | 14 | 84 | 0 | 0.25 |
+| + hysteresis (5 in / 8 out) | 69 | +392.9% | 14 | 55 | 0 | 0.337 |
+| + edge margin (10 px) | 65 | +364.3% | 14 | 51 | 0 | 0.354 |
+| + min dwell 1 s, cooldown 1.5 s | 39 | +178.6% | 14 | 25 | 0 | 0.528 |
+
+The same steps on `greedy_iou:max_age=5` tracks, the best tracker below, which splits vehicles into 383 track IDs:
+
+| step | enters | enter error pct | matched | false visits | missed visits | f1 |
+|---|---|---|---|---|---|---|
+| baseline (naive, centroid) | 171 | +1121.4% | 14 | 157 | 0 | 0.151 |
+| + footpoint anchor | 194 | +1285.7% | 14 | 180 | 0 | 0.135 |
+| + hysteresis (5 in / 8 out) | 83 | +492.9% | 14 | 69 | 0 | 0.289 |
+| + edge margin (10 px) | 79 | +464.3% | 14 | 65 | 0 | 0.301 |
+| + min dwell 1 s, cooldown 1.5 s | 21 | +50.0% | 12 | 9 | 2 | 0.686 |
+
+Its many fragments are short, so the minimum dwell removes most of them; that is why it ends up best.
 
 Tracker swap on the same detections, debounced counter (`replay.compare`, commands in Reproduce):
 
@@ -71,6 +92,9 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
 
 ## What did not work
 
+- The footpoint anchor made counts worse on this view: +600.0% against +457.1% for the centroid on ByteTrack tracks,
+  and +1285.7% against +1121.4% on `greedy_iou:max_age=5`. On the synthetic shadow fixture it is what removes the false
+  visit. Not yet diagnosed.
 - `groundplane`, the tracker that fixes the synthetic queue, does not help at this intersection: F1 0.538, and 0.56 with
   its lane direction set along the zone (`--param 'lane_dir=[0.85,0.53]'`). One lane direction cannot describe turning
   traffic from several approaches, and its gates were tuned on the synthetic queue at 10 fps.
@@ -92,6 +116,9 @@ docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
 cd harness
 python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json
 python -m replay.cli --tracks runs/bytetrack.jsonl --zone zone.json --expected 14
+python -m replay.ablation --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json
+python -m replay.track --dets runs/dets.jsonl --tracker greedy_iou --param max_age=5 --out runs/greedy_iou_5.jsonl
+python -m replay.ablation --tracks runs/greedy_iou_5.jsonl --zone zone.json --truth truth.json
 python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json \
     --trackers greedy_iou:max_age=5 greedy_iou groundplane --tracks bytetrack=runs/bytetrack.jsonl
 python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lane_dir=[0.85,0.53]' --out runs/groundplane_diag.jsonl

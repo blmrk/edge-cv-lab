@@ -51,7 +51,7 @@ python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.j
   then pass `--tracks groundplane=runs/ground.jsonl` to `replay.compare`.
 - Done: the table is pasted into the case study "Baseline" and "Fixes" sections with the exact command.
 - Status: done. Baseline (naive and debounced counter on ByteTrack) and the tracker table are in the case study with their
-  commands. The per-step counter rows (footpoint, hysteresis, margin, dwell) still need a command that runs each setting.
+  commands. The per-step counter rows come from `python -m replay.ablation`.
 
 ### 4. Real-footage visuals
 - Add a `--video` option to `replay/trackviz.py` (use the clip's frames as background instead of the
