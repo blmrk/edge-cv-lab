@@ -45,8 +45,9 @@ track's footpoint ever moved, and they fall in two groups with nothing between: 
 first group sits on the white dashes of the bike lane that crosses the zone: the detector scores lane markings as cars
 at low confidence, and ByteTrack keeps them as parked tracks (Ultralytics' defaults start a track at score 0.25 and keep
 it on boxes down to 0.1). Scored on their own, the 21 moving enters match all 14 labelled visits with 7 false (F1 0.8,
-against 0.528 with the phantoms). So 18 of ByteTrack's 25 extra visits are phantoms and 7 are moving vehicles with no
-label within 2 s. Phantom boxes get their own case study; this one keeps the detector's threshold as it is. The
+against 0.528 with the phantoms). So 18 of ByteTrack's 25 extra visits are phantoms, and 7 are moving enters with no
+labelled visit left to match: vehicles the labels do not count, or a second vehicle entering close to one that took
+the label. Phantom boxes get their own case study; this one keeps the detector's threshold as it is. The
 debounced counter still removes most of the naive counter's excess.
 
 The GIF in the README (`docs/footage/real-compare.gif`, `make footage`) shows two of the trackers below over 13 s of the
@@ -116,9 +117,9 @@ it counts fewer (16 against 110 for ByteTrack). Both rank ByteTrack first on ide
 
 The two rankings disagree, and `--explain` says why. ByteTrack keeps identities best yet counts worst because it keeps
 the lane-marking phantoms: 18 of its 39 enters, against 4 of 21 for `greedy_iou:max_age=5`. That gap is the score
-floor, not the association: 14090 of the 21902 detections score under 0.3, and with `min_score=0.1` the same tracker
-logs 121 enters, 95 of them static. On moving enters alone ByteTrack counts better too, F1 0.8 against 0.774. The
-tracker swap mostly swaps the score floor.
+floor: 14090 of the 21902 detections score under 0.3, and with `min_score=0.1` the same tracker logs 121 enters, 95
+of them static. On moving enters alone the two are close: F1 0.8 for ByteTrack (21 enters, 14 matched, 7 false)
+against 0.774 (17 enters, 12 matched, 5 false, 2 missed). The tracker swap mostly swaps the score floor.
 
 ### Detector fix: class-agnostic NMS
 
@@ -183,7 +184,8 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
 - The visit ground truth rests on three passes, two of them by an AI model reading contact sheets; the third comes from
   the dataset's own annotations. They found 14, 12 and 20 visits, and a visit counts when two of three include it.
 - Visits are matched on enter time alone (2 s tolerance), so an enter from the wrong object can take a labelled visit's
-  match. The totals stay right; to see which enters are real, `--explain` scores the moving enters on their own.
+  match and hide a miss: at `min_score=0.1` the 1 s-buffer tracker scores recall 1.0 with its phantoms and 12 of 14
+  on its moving enters alone. `--explain` scores the moving enters on their own for that reason.
 - Identity metrics only see the annotated vehicles the detector finds: 18 to 21% of ground-truth boxes are matched, and
   DetA is 0.135 to 0.143.
 - The harness trackers and ByteTrack use different score floors (0.3 and 0.1), so the tracker comparison mixes
