@@ -1,6 +1,6 @@
 # Case study: counting vehicles once
 
-> Status: template. Numbers marked `TBD` are filled from real runs. Do not publish estimates.
+> Status: in progress. Numbers marked `TBD` are filled from real runs. Do not publish estimates.
 
 ## Problem
 
@@ -29,7 +29,11 @@ Zone-based vehicle analytics report inflated visit counts and wrong dwell times.
 | Precision / recall / F1 of visits (`replay.score`, 2 s tolerance) | 0.167 / 0.929 / 0.283 | 0.359 / 1.0 / 0.528 |
 | Tracks with more than one enter | 0 | 0 |
 | Net balance (enters minus exits) | 66 | 3 |
-| ID switches / IDF1 / HOTA (TrackEval) | TBD | TBD |
+| ID switches (`replay.compare --gt`) / IDF1 / HOTA (TrackEval) | 110 / TBD / TBD | 110 / TBD / TBD |
+
+ID switches are counted against ground-truth tracks built from the dataset's own annotations (`mtid_to_gt.py`), on the
+20.5% of ground-truth boxes a ByteTrack box overlaps at IoU 0.5 or more. Coverage is low: much of the annotated traffic runs
+along the top of the frame, partly under the burned-in timestamp band, where few detections land.
 
 No track re-enters the zone, so every extra visit is a new track ID for a vehicle already counted: on this footage the
 tracker, not the zone logic, drives the error. The debounced counter still removes most of the naive counter's excess.
@@ -71,14 +75,19 @@ The same steps on `greedy_iou:max_age=5` tracks, the best tracker below, which s
 
 Its many fragments are short, so the minimum dwell removes most of them; that is why it ends up best.
 
-Tracker swap on the same detections, debounced counter (`replay.compare`, commands in Reproduce):
+Tracker swap on the same detections, debounced counter, identity against the annotated tracks (`replay.compare --gt`,
+commands in Reproduce):
 
-| tracker | labelled | predicted | missed visits | false visits | f1 |
-|---|---|---|---|---|---|
-| greedy_iou:max_age=5 | 14 | 21 | 2 | 9 | 0.686 |
-| greedy_iou | 14 | 31 | 1 | 18 | 0.578 |
-| groundplane | 14 | 38 | 0 | 24 | 0.538 |
-| bytetrack | 14 | 39 | 0 | 25 | 0.528 |
+| tracker | labelled | predicted | missed visits | false visits | f1 | id switches | id transfers | pred ids | gt objects | gt boxes matched pct |
+|---|---|---|---|---|---|---|---|---|---|---|
+| greedy_iou:max_age=5 | 14 | 21 | 2 | 9 | 0.686 | 368 | 0 | 383 | 65 | 18.2 |
+| greedy_iou | 14 | 31 | 1 | 18 | 0.578 | 347 | 3 | 273 | 65 | 18.2 |
+| groundplane | 14 | 38 | 0 | 24 | 0.538 | 349 | 40 | 148 | 65 | 18.2 |
+| bytetrack | 14 | 39 | 0 | 25 | 0.528 | 110 | 0 | 194 | 65 | 20.5 |
+
+The two rankings disagree. ByteTrack keeps identities best (a third of the switches) yet counts visits worst; the
+short-buffer IoU tracker counts best only because its fragments are too short to pass the minimum dwell. Counting
+accuracy here comes from the counter's rules absorbing fragmentation, not from better tracking.
 
 ## Synthetic confirmation
 
@@ -94,7 +103,12 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
 
 - The footpoint anchor made counts worse on this view: +600.0% against +457.1% for the centroid on ByteTrack tracks,
   and +1285.7% against +1121.4% on `greedy_iou:max_age=5`. On the synthetic shadow fixture it is what removes the false
-  visit. Not yet diagnosed.
+  visit. Diagnosis: every extra enter is on the zone's two far edges, from traffic on the far road and in the lane just
+  beyond them. On this oblique view a box's bottom-centre is not the vehicle's ground contact: it sits below the vehicle,
+  towards the camera, so vehicles running just outside the far edges dip in, while the centroid sits too high. It is not
+  box-height flicker. Duplicate boxes add to it: `dump_detections.py` runs non-maximum suppression per class, so one
+  vehicle can keep both a car and a truck box and each becomes a track. A ground-contact point from a road-plane mapping
+  would fix the anchor properly; tuning the anchor height on 14 visits would fit noise.
 - `groundplane`, the tracker that fixes the synthetic queue, does not help at this intersection: F1 0.538, and 0.56 with
   its lane direction set along the zone (`--param 'lane_dir=[0.85,0.53]'`). One lane direction cannot describe turning
   traffic from several approaches, and its gates were tuned on the synthetic queue at 10 fps.
@@ -119,8 +133,10 @@ python -m replay.cli --tracks runs/bytetrack.jsonl --zone zone.json --expected 1
 python -m replay.ablation --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json
 python -m replay.track --dets runs/dets.jsonl --tracker greedy_iou --param max_age=5 --out runs/greedy_iou_5.jsonl
 python -m replay.ablation --tracks runs/greedy_iou_5.jsonl --zone zone.json --truth truth.json
-python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json \
+python scripts/mtid_to_gt.py --annotations ../media/candidates/mtid/annotations/Infrastructure --out runs/mtid
+python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json --gt runs/mtid.gt.jsonl \
     --trackers greedy_iou:max_age=5 greedy_iou groundplane --tracks bytetrack=runs/bytetrack.jsonl
 python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lane_dir=[0.85,0.53]' --out runs/groundplane_diag.jsonl
 python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json --tracks groundplane_diagonal=runs/groundplane_diag.jsonl
+cd .. && make footage   # docs/footage/real-compare.gif
 ```
