@@ -68,3 +68,19 @@ def test_lost_track_inside_zone_is_closed_not_left_open():
     never = [e for e in run(DebouncedZoneCounter(POLY, lost_ms=10**9), tracks) if e.kind == "exit"]
     closed = [e for e in run(DebouncedZoneCounter(POLY), tracks) if e.kind == "exit"]
     assert len(never) == 0 and len(closed) >= 5
+
+
+def test_compare_reports_gt_coverage_next_to_identity_metrics(monkeypatch, capsys):
+    # identity metrics only cover GT boxes some prediction overlaps, so the table must say how many that is
+    import sys
+    from replay import compare
+    fx = Path(__file__).resolve().parent.parent / "fixtures"
+    monkeypatch.setattr(sys, "argv", ["compare", "--dets", str(fx / "queue.dets.jsonl"), "--zone", str(fx / "zone.json"),
+                                      "--truth", str(fx / "queue.truth.json"), "--gt", str(fx / "queue.gt.jsonl"),
+                                      "--trackers", "groundplane"])
+    compare.main()
+    header, _, row = capsys.readouterr().out.splitlines()[:3]
+    cols = [c.strip() for c in header.strip("|").split("|")]
+    vals = dict(zip(cols, [c.strip() for c in row.strip("|").split("|")]))
+    assert vals["gt objects"] == "6"  # the queue fixture has six cars
+    assert 0 < float(vals["gt boxes matched pct"]) <= 100

@@ -52,7 +52,7 @@ def main():
         rows[name] = evaluate(list(read_tracks(path)), poly, truth, gt, a.tolerance_ms)
 
     cols = ["labelled", "predicted", "missed_visits", "false_visits", "f1"] + (
-        ["id_switches", "id_transfers", "pred_ids"] if gt else [])
+        ["id_switches", "id_transfers", "pred_ids", "gt_objects", "gt_boxes_matched_pct"] if gt else [])
     print("| tracker | " + " | ".join(c.replace("_", " ") for c in cols) + " |")
     print("|---|" + "---|" * len(cols))
     for name, r in rows.items():
