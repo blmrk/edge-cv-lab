@@ -7,7 +7,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 video = ["ultralytics>=8.3", "opencv-python-headless"]
-viz = ["opencv-python-headless", "numpy", "matplotlib", "imageio"]
+viz = ["opencv-python-headless", "numpy", "matplotlib", "imageio", "pillow>=9.1"]  # 9.1: Image.Quantize and Image.Dither enums
 
 [tool.setuptools.packages.find]
 include = ["replay*"]
