@@ -14,7 +14,7 @@ Last updated 2026-09-26. Everything below has been run unless marked otherwise.
 | Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken |
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
 | Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
-| `tools/label.html` | used to draw the zone and label the clip |
+| `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
 | `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** (task deferred) |
 
 ## Case studies
