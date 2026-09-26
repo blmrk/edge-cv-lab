@@ -17,7 +17,9 @@ Zone-based vehicle analytics report inflated visit counts and wrong dwell times.
   found 20 for frames 1-3099, counting vehicles that run along the zone edge. A visit counts when at least two of the three
   passes include it. Clip logged in `media/SOURCES.md`.
 - Detections and tracks: `yolov8n` on CPU inside the edge image. `dump_detections.py` feeds the harness trackers and
-  `dump_tracks.py` gives ByteTrack's own tracks, saved under `harness/runs/` (gitignored; the Reproduce commands regenerate them)
+  `dump_tracks.py` gives ByteTrack's own tracks, saved under `harness/runs/` (gitignored; the Reproduce commands regenerate them).
+  The baseline and the steps up to the tracker swap use the detector's default per-class non-maximum suppression
+  (`--per-class-nms`); the last step switches it to class-agnostic.
 - Zone: polygon in `harness/zone.json`, drawn in `tools/label.html` over the crossing lanes; the edge uses the same polygon
   (`ZONE_POLYGON` in `docker-compose.yml`)
 
@@ -50,6 +52,7 @@ Add a GIF of the worst offender here. One clip of a box flickering on a boundary
 | + edge margin (10 px) | +364.3% (65) | parked on the zone edge |
 | + min dwell 1 s, cooldown 1.5 s | +178.6% (39) | largest single step: fragment tracks shorter than a second no longer count |
 | + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | table below | best here: `greedy_iou:max_age=5`, 21 vs 14 |
+| + class-agnostic NMS (detector) | +85.7% (26) | `greedy_iou:max_age=5`: F1 0.686 to 0.7, missed visits 2 to 0, ID switches 368 to 68 |
 
 Report each step separately. An ablation is more convincing than one before/after pair.
 
@@ -89,6 +92,26 @@ The two rankings disagree. ByteTrack keeps identities best (a third of the switc
 short-buffer IoU tracker counts best only because its fragments are too short to pass the minimum dwell. Counting
 accuracy here comes from the counter's rules absorbing fragmentation, not from better tracking.
 
+### Detector fix: class-agnostic NMS
+
+Non-maximum suppression runs per class by default, so one vehicle scored as both car and truck keeps two boxes and a
+tracker follows each. With class-agnostic NMS the detector keeps the higher-scoring box: 20151 boxes instead of 21902 over the
+clip (`wc -l`), everything else unchanged. Same table on the new detections:
+
+| tracker | labelled | predicted | missed visits | false visits | f1 | id switches | id transfers | pred ids | gt objects | gt boxes matched pct |
+|---|---|---|---|---|---|---|---|---|---|---|
+| greedy_iou:max_age=5 | 14 | 26 | 0 | 12 | 0.7 | 68 | 0 | 272 | 65 | 18.2 |
+| greedy_iou | 14 | 31 | 0 | 17 | 0.622 | 46 | 1 | 194 | 65 | 18.2 |
+| groundplane | 14 | 32 | 0 | 18 | 0.609 | 44 | 22 | 114 | 65 | 18.2 |
+| bytetrack | 14 | 39 | 0 | 25 | 0.528 | 11 | 0 | 117 | 65 | 20.7 |
+
+The NMS mode is the only change, so the drop comes from the cross-class overlapping boxes it removes: ID switches fall
+from 368, 347, 349 and 110 to 68, 46, 44 and 11. Visit F1 rises for the three harness trackers and none of the four
+misses a visit. The best tracker's count gets worse, 26 against 21, because a count nets false visits against
+missed ones: 21 was 12 matched and 9 false with 2 missed, 26 is 14 matched and 12 false. ByteTrack's debounced count
+does not move (39, F1 0.528); its naive count drops from 78 to 62 and its net balance from 66 to 50. The fix shows up
+in identity far more than in counting, and the rankings still disagree: ByteTrack switches least and counts worst.
+
 ## Synthetic confirmation
 
 | Fixture | Truth | Naive | Debounced |
@@ -106,11 +129,12 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
   visit. Diagnosis: every extra enter is on the zone's two far edges, from traffic on the far road and in the lane just
   beyond them. On this oblique view a box's bottom-centre is not the vehicle's ground contact: it sits below the vehicle,
   towards the camera, so vehicles running just outside the far edges dip in, while the centroid sits too high. It is not
-  box-height flicker. Duplicate boxes add to it: `dump_detections.py` runs non-maximum suppression per class, so one
-  vehicle can keep both a car and a truck box and each becomes a track. A ground-contact point from a road-plane mapping
-  would fix the anchor properly; tuning the anchor height on 14 visits would fit noise.
+  box-height flicker, and not the duplicate boxes: with class-agnostic NMS the footpoint step is still worse, +435.7%
+  against +342.9% on ByteTrack and +971.4% against +864.3% on `greedy_iou:max_age=5`. A ground-contact point from a
+  road-plane mapping would fix the anchor properly; tuning the anchor height on 14 visits would fit noise.
 - `groundplane`, the tracker that fixes the synthetic queue, does not help at this intersection: F1 0.538, and 0.56 with
-  its lane direction set along the zone (`--param 'lane_dir=[0.85,0.53]'`). One lane direction cannot describe turning
+  its lane direction set along the zone (`--param 'lane_dir=[0.85,0.53]'`); 0.609 and 0.596 with class-agnostic NMS,
+  still behind the IoU trackers. One lane direction cannot describe turning
   traffic from several approaches, and its gates were tuned on the synthetic queue at 10 fps.
 
 Keep this section. Parameters that over-suppressed real short visits, cases where footpoint was worse, and so on.
@@ -124,9 +148,14 @@ Single camera angle, daytime footage, small ground-truth set, CPU-only model.
 ```bash
 pip install -e "harness[dev]"   # scoring; detection runs in the edge image that `make up-video` builds
 docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
-  python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --out runs/dets.jsonl
+  python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --per-class-nms --out runs/dets.jsonl
 docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
-  python scripts/dump_tracks.py --video ../media/sample.mp4 --model /app/yolov8n.pt --tracker bytetrack.yaml --out runs/bytetrack.jsonl
+  python scripts/dump_tracks.py --video ../media/sample.mp4 --model /app/yolov8n.pt --per-class-nms --tracker bytetrack.yaml --out runs/bytetrack.jsonl
+# class-agnostic NMS, the scripts' default
+docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
+  python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --out runs/dets.agnostic.jsonl
+docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
+  python scripts/dump_tracks.py --video ../media/sample.mp4 --model /app/yolov8n.pt --tracker bytetrack.yaml --out runs/bytetrack.agnostic.jsonl
 cd harness
 python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json
 python -m replay.cli --tracks runs/bytetrack.jsonl --zone zone.json --expected 14
@@ -138,5 +167,15 @@ python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.j
     --trackers greedy_iou:max_age=5 greedy_iou groundplane --tracks bytetrack=runs/bytetrack.jsonl
 python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lane_dir=[0.85,0.53]' --out runs/groundplane_diag.jsonl
 python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json --tracks groundplane_diagonal=runs/groundplane_diag.jsonl
+# class-agnostic NMS
+wc -l runs/dets.jsonl runs/dets.agnostic.jsonl
+python -m replay.cli --tracks runs/bytetrack.agnostic.jsonl --zone zone.json --expected 14
+python -m replay.ablation --tracks runs/bytetrack.agnostic.jsonl --zone zone.json --truth truth.json
+python -m replay.track --dets runs/dets.agnostic.jsonl --tracker greedy_iou --param max_age=5 --out runs/greedy_iou_5.agnostic.jsonl
+python -m replay.ablation --tracks runs/greedy_iou_5.agnostic.jsonl --zone zone.json --truth truth.json
+python -m replay.compare --dets runs/dets.agnostic.jsonl --zone zone.json --truth truth.json --gt runs/mtid.gt.jsonl \
+    --trackers greedy_iou:max_age=5 greedy_iou groundplane --tracks bytetrack=runs/bytetrack.agnostic.jsonl
+python -m replay.track --dets runs/dets.agnostic.jsonl --tracker groundplane --param 'lane_dir=[0.85,0.53]' --out runs/groundplane_diag.agnostic.jsonl
+python -m replay.compare --dets runs/dets.agnostic.jsonl --zone zone.json --truth truth.json --tracks groundplane_diagonal=runs/groundplane_diag.agnostic.jsonl
 cd .. && make footage   # docs/footage/real-compare.gif
 ```
