@@ -9,7 +9,8 @@ webcam indexes are numbered in read order at their own fps.
 Image frames are numbered from the file name (img00001.jpg -> frame 0), not by read order, so a frame
 that fails to load leaves a gap instead of shifting every later frame against the ground truth.
 conf defaults to 0.1 on purpose: ByteTrack-style trackers use low-score boxes to ride through occlusion.
-NMS is class-agnostic: one vehicle scored as both car and truck is one box, not two for a tracker to follow.
+NMS is class-agnostic: a car box and a truck box overlapping above IoU 0.7 (Ultralytics' default iou) keep only the
+higher-scoring one, instead of both reaching the tracker as two vehicles.
 """
 import argparse
 import json
