@@ -76,3 +76,18 @@ def test_score_does_not_let_errors_cancel():
     r = match(pred_ms=[1000, 1200, 30000], true_ms=[1000, 15000, 30000], tol_ms=2000)
     assert r["count_error_pct"] == 0.0
     assert (r["matched"], r["false_visits"], r["missed_visits"]) == (2, 1, 1)
+
+
+def test_explain_separates_a_parked_phantom_from_a_moving_vehicle():
+    from replay.schema import TrackBox
+    from replay.score import explain
+    square = [(100, 100), (500, 100), (500, 500), (100, 500)]
+    car = [TrackBox(f, f * 100, 1, (10 * f - 20, 260, 10 * f + 20, 300)) for f in range(60)]  # drives through
+    dash = [TrackBox(f, f * 100, 2, (280, 280, 320, 300), 0.2) for f in range(200, 241)]  # never moves, inside
+    boxes = sorted(car + dash, key=lambda b: (b.frame, b.track_id))
+
+    rows = explain(boxes, square, truth_ms=[1100], tol_ms=2000)
+
+    assert [(r["track_id"], r["matched"]) for r in rows] == [(1, True), (2, False)]
+    assert rows[0]["travel_px"] == 590.0 and rows[1]["travel_px"] == 0.0
+    assert (rows[1]["w"], rows[1]["h"], rows[1]["score"]) == (40.0, 20.0, 0.2)
