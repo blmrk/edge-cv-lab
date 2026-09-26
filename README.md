@@ -55,11 +55,19 @@ The 24-vehicle traffic fixture (ground truth 17 visits) gives 205 naive vs 17 de
 
 Every image in `docs/img` is generated from checked-in fixtures: `pip install -e "harness[viz]" && make visuals && make trackers`. `replay.viz compare`, `heatmap` and `trajectories` take `--video clip.mp4` to draw over a real frame instead of the schematic road.
 
+### On real footage
+
+A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone: the extra visits are the tracker splitting one vehicle into several IDs.
+
+![two IoU trackers over the real clip, IDs as coloured tags](docs/footage/real-compare.gif)
+
+Footage: [MTID](https://vap.aau.dk/mtid/) (Multi-View Traffic Intersection Dataset) infrastructure camera by M. B. Jensen, A. Møgelmose and T. B. Moeslund, Aalborg University, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Frames re-encoded to video, cropped and resized, with tracking overlays added; rendered with `make footage`.
+
 Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-tracking.md).
 
 ## Quick start
 
-> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). `make broker-restart` has been run on a fresh lab: with ingest away for 60 s across a broker restart, all 846 events of the 3 finished scenes arrived exactly once. `make up-video` has been booted on a fixed CCTV intersection clip: `edge-01` events reach Postgres and Grafana; zone accuracy is not measured until the zone is labelled. `make visuals` and `make trackers` are not run in CI.
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). `make broker-restart` has been run on a fresh lab: with ingest away for 60 s across a broker restart, all 846 events of the 3 finished scenes arrived exactly once. `make up-video` has been booted on a fixed CCTV intersection clip: `edge-01` events reach Postgres and Grafana. The same clip, labelled, is scored offline in the case study. `make visuals` and `make trackers` are not run in CI.
 
 **Harness (no Docker):**
 
