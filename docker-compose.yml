@@ -24,7 +24,7 @@ services:
     image: emqx/emqx:5.8
     ports: ["18083:18083"]  # dashboard: admin / public
     environment:  # keep ingest's session and its queued events on disk across a broker restart
-      EMQX_DURABLE_SESSIONS__ENABLE: "true"
+      EMQX_DURABLE_SESSIONS__ENABLE: "${DURABLE_SESSIONS:-true}"  # false: the broker-restart failure, for a before run
       EMQX_CLUSTER__DISCOVERY_STRATEGY: singleton  # required by the local durable storage backend
     healthcheck:
       test: ["CMD", "emqx", "ctl", "status"]
@@ -71,7 +71,7 @@ services:
     profiles: [sim]
     build: { context: ., dockerfile: services/sim/Dockerfile }
     depends_on: [toxiproxy]
-    environment: { DEVICE_ID: sim-01, MQTT_HOST: toxiproxy, SPEED: "2" }
+    environment: { DEVICE_ID: sim-01, MQTT_HOST: toxiproxy, SPEED: "2", QOS: "${SIM_QOS:-1}" }  # SIM_QOS=0: before run
     restart: unless-stopped
 
   grafana:

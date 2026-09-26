@@ -15,6 +15,9 @@ from replay.zones import DebouncedZoneCounter, NaiveZoneCounter
 DEVICE = os.environ.get("DEVICE_ID", "sim-01")
 SPEED = float(os.environ.get("SPEED", "2"))  # 2 = twice real time
 HOST, PORT = os.environ.get("MQTT_HOST", "toxiproxy"), int(os.environ.get("MQTT_PORT", "1883"))
+# Zone events only. 0 = fire-and-forget, the failure the uplink drill measures; truth and heartbeat stay at 1,
+# since the delivery check needs each scene's truth to know the scene finished.
+QOS = int(os.environ.get("QOS", "1"))
 
 
 def main():
@@ -41,7 +44,7 @@ def main():
                         # event time, not publish time: debounced enters are held until the visit closes
                         c.publish(f"events/{DEVICE}/zone", json.dumps({
                             "event_id": str(ULID()), "device_id": DEVICE, "counter": name, "kind": ev.kind,
-                            "track_id": seed * 1000 + ev.track_id, "ts_ms": wall0 + int(ev.ts_ms / SPEED)}), qos=1)
+                            "track_id": seed * 1000 + ev.track_id, "ts_ms": wall0 + int(ev.ts_ms / SPEED)}), qos=QOS)
             if time.monotonic() - last_hb > 10:
                 fps = n / (time.monotonic() - last_hb) if last_hb else FPS * SPEED
                 c.publish(f"devices/{DEVICE}/status", json.dumps({"state": "online", "fps": round(fps, 1)}),
