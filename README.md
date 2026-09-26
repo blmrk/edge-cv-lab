@@ -57,9 +57,9 @@ Every image in `docs/img` is generated from checked-in fixtures: `pip install -e
 
 ### On real footage
 
-A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone: the extra visits are the tracker splitting one vehicle into several IDs. Those runs use the detector's default per-class NMS, which can leave a car box and a truck box on one vehicle; with class-agnostic NMS, ID switches against the dataset's annotated tracks fall from 110 to 11 for ByteTrack and from 368 to 68 for the short-buffer IoU tracker, while visit counts move less.
+A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone: the extra visits are extra track IDs for vehicles already counted. Those runs, and the GIF below, use the detector's default per-class NMS, which can leave a car box and a truck box on one vehicle. With class-agnostic NMS, now the default here, ID switches against the dataset's annotated tracks fall from 110 to 11 for ByteTrack and from 368 to 68 for the short-buffer IoU tracker. Counts move less: ByteTrack's debounced count stays at 39, and the IoU tracker's goes from 21 to 26 as it stops missing 2 visits but adds 3 false ones.
 
-![two IoU trackers over the real clip, IDs as coloured tags](docs/footage/real-compare.gif)
+![two IoU trackers over the real clip (per-class NMS detections), IDs as coloured tags](docs/footage/real-compare.gif)
 
 Footage: [MTID](https://vap.aau.dk/mtid/) (Multi-View Traffic Intersection Dataset) infrastructure camera by M. B. Jensen, A. Møgelmose and T. B. Moeslund, Aalborg University, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Frames re-encoded to video, cropped and resized, with tracking overlays added; rendered with `make footage`.
 

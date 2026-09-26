@@ -42,7 +42,7 @@ Each task lists the command and what "done" means. Do them in order; later ones 
 ### 3. Detections and baseline
 ```bash
 cd harness && pip install -e ".[video,viz]"
-python scripts/dump_detections.py --video ../media/sample.mp4 --out runs/dets.jsonl
+python scripts/dump_detections.py --video ../media/sample.mp4 --per-class-nms --out runs/dets.jsonl
 python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json \
     --trackers greedy_iou:max_age=5 greedy_iou groundplane
 ```
@@ -96,6 +96,9 @@ python -m replay.track --dets runs/dets.jsonl --tracker boxmot_bytetrack --out r
 - About description, topics and social preview (a `trackers.gif` frame) are set on GitHub. The Grafana screenshot is in README, from `docs/screenshots/`.
 
 ## Known rough edges
+- The case study's baseline, ablation tables, first tracker table, the README's 78/39/21 and `real-compare.gif` use
+  per-class NMS detections (`--per-class-nms`, runs/dets.jsonl). The dump scripts and the edge now default to
+  class-agnostic NMS, measured in the case study's "Detector fix". Task 9: decide whether to re-baseline on it.
 - The edge logs `Waiting for stream 0` whenever inference catches up with the RTSP stream. Log noise, not a stall.
 - `DebouncedZoneCounter.margin_px=10` was set against the synthetic ±6 px edge jitter in a 1280 px frame. On a real
   clip, check a parked vehicle's footpoint jitter and draw the zone so stops sit more than `margin_px` inside it.
