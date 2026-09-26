@@ -67,7 +67,7 @@ Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-t
 
 ## Quick start
 
-> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.59 s under latency, up to 122.54 s after the outage). `make broker-restart` has been run on a fresh lab: with ingest away for 60 s across a broker restart, all 846 events of the 3 finished scenes arrived exactly once. `make up-video` has been booted on a fixed CCTV intersection clip: `edge-01` events reach Postgres and Grafana. The same clip, labelled, is scored offline in the case study. `make visuals` and `make trackers` are not run in CI.
+> **Verified so far:** CI runs the harness tests, checks fixtures regenerate byte-identical, and builds and import-checks the `sim` and `ingest` images. `make up` has been booted end to end: events reach Postgres and every Grafana panel fills. `make drill` has been run on a fresh lab: through a 64 kbps cap, 400 ms latency each way and a 2 minute outage, all 1388 events of the 5 scenes that finished arrived exactly once (naive-event delivery lag: median 0.86 s under latency, up to 120.05 s after the outage); with the device at QoS 0 (`SIM_QOS=0`) the same drill loses 462 of them. `make broker-restart` has been run on a fresh lab: with ingest away for 60 s across a broker restart, all 846 events of the 3 finished scenes arrived exactly once; without durable sessions (`DURABLE_SESSIONS=false`) 157 are lost. Write-up: [docs/case-study-delivery.md](docs/case-study-delivery.md). `make up-video` has been booted on a fixed CCTV intersection clip: `edge-01` events reach Postgres and Grafana. The same clip, labelled, is scored offline in the case study. `make visuals` and `make trackers` are not run in CI.
 
 **Harness (no Docker):**
 
@@ -113,6 +113,7 @@ chaos/scenarios.sh reset
 make delivery                 # did every event arrive exactly once? each finished scene vs its offline replay
 make drill                    # all of it on a fresh lab, ~9 min, with a delivery-lag table per phase
 make broker-restart           # fresh lab, ~5 min: ingest away across a broker restart, then the same check
+# before runs: SIM_QOS=0 make up (fire-and-forget events), DURABLE_SESSIONS=false make up (no durable sessions)
 # Grafana: events flatline, then a catch-up spike with high delivery lag
 ```
 
