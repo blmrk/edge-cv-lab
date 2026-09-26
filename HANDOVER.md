@@ -36,6 +36,8 @@ Each task lists the command and what "done" means. Do them in order; later ones 
 - Save `harness/zone.json` and `harness/truth.json` (both gitignored). Note pass-to-pass difference
   in the case study; if it differs by more than 2, redraw the zone.
 - Done: both files exist and `expected_visits` is recorded in the case study.
+- Status: done. 14 visits; the two visual passes differ by 2 (14 vs 12), within the redraw threshold. The edge now uses
+  the same zone (`ZONE_POLYGON` in `docker-compose.yml`).
 
 ### 3. Detections and baseline
 ```bash

@@ -9,7 +9,10 @@ Zone-based vehicle analytics report inflated visit counts and wrong dwell times.
 ## Reproducing it without hardware
 
 - Footage: `TBD` (source, licence, duration, resolution, camera angle)
-- Ground truth: `TBD` visits, labelled with `tools/label.html` at 2x, `TBD` passes. Logged in `media/SOURCES.md`.
+- Ground truth: 14 visits in the zone drawn in `tools/label.html` (`harness/zone.json`). Two independent visual passes over
+  0.5 s contact sheets found 14 and 12 (pass-to-pass difference 2); a third pass derived from the dataset's annotated tracks
+  found 20 for frames 1-3099, counting vehicles that run along the zone edge. A visit counts when at least two of the three
+  passes include it. Clip logged in `media/SOURCES.md`.
 - Tracks: `dump_tracks.py` with `yolov8n`, run once per tracker and saved under `harness/runs/` (gitignored; regenerate each with `dump_tracks.py` as in Reproduce below)
 - Zone: polygon in `TBD.json`, screenshot below
 
