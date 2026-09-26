@@ -21,8 +21,8 @@ trackers:  ## tracker comparison table + space-time diagram on the queue fixture
 	      --trackers "greedy_iou:max_age=5" greedy_iou groundplane \
 	      --labels "IoU tracker, 0.5 s buffer" "IoU tracker, 3 s buffer" "ground-plane tracker" \
 	      --occluder 440 560 --every 3 --fps 10 --width 800 --out ../docs/img/trackers.gif
-# footage needs media/sample.mp4 and harness/runs/dets.jsonl, both gitignored: docs/case-study-tracking.md, Reproduce,
-# makes the detections. 20-33 s holds 5 of the 14 labelled visits in harness/truth.json.
+# footage needs media/sample.mp4, harness/zone.json (drawn in tools/label.html) and harness/runs/dets.jsonl, all
+# gitignored: docs/case-study-tracking.md, Reproduce, makes the detections. 20-33 s holds 5 of the 14 labelled visits in harness/truth.json.
 footage:   ## tracker comparison over the real clip, not the fixture: docs/footage/real-compare.gif
 	cd harness && mkdir -p ../docs/footage \
 	 && python -m replay.trackviz --video ../media/sample.mp4 --dets runs/dets.jsonl --zone zone.json \
