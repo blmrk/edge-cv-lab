@@ -57,7 +57,7 @@ Every image in `docs/img` is generated from checked-in fixtures: `pip install -e
 
 ### On real footage
 
-A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone: the extra visits are extra track IDs for vehicles already counted. Those runs, and the GIF below, use the detector's default per-class NMS, which can leave a car box and a truck box on one vehicle. With class-agnostic NMS, now the default here, ID switches against the dataset's annotated tracks fall from 110 to 11 for ByteTrack and from 368 to 68 for the short-buffer IoU tracker. Counts move less: ByteTrack's debounced count stays at 39, and the IoU tracker's goes from 21 to 26 as it stops missing 2 visits but adds 3 false ones.
+A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits in the zone. YOLOv8n with ByteTrack and the naive counter logs 78 visits, the debounced counter 39. On the same detections, the IoU tracker with a short buffer plus the debounced counter logs 21. No track re-enters the zone. 18 of ByteTrack's 39 debounced enters come from tracks that never moved: white lane-marking dashes inside the zone that the detector, at its low 0.1 threshold, scores as cars. The other false visits are moving vehicles, split into extra track IDs or not in the labels. Those runs, and the GIF below, use the detector's default per-class NMS, which can leave a car box and a truck box on one vehicle. With class-agnostic NMS, now the default here, ID switches against the dataset's annotated tracks fall from 110 to 11 for ByteTrack and from 368 to 68 for the short-buffer IoU tracker. Counts move less: ByteTrack's debounced count stays at 39, and the IoU tracker's goes from 21 to 26 as it stops missing 2 visits but adds 3 false ones.
 
 ![two IoU trackers over the real clip (per-class NMS detections), IDs as coloured tags](docs/footage/real-compare.gif)
 
@@ -133,7 +133,7 @@ make broker-restart           # fresh lab, ~5 min: ingest away across a broker r
 | Next car inherits the previous car's ID, merging visits | IoU association plus a track left parked where a vehicle vanished | Ground-contact association with a lane-shaped gate and damped coasting | `queue.dets.jsonl` |
 | "Online" device that is actually dead | Health inferred from network reachability | App-level heartbeat with FPS, plus MQTT last-will | lab |
 
-Roadmap: published trackers (FastTracker, UCMCTrack, TrackTrack) on real footage through the MOT bridge, scored with TrackEval; phantom boxes between parallel vehicles, entry/exit net-balance reconciliation, broker drain test on kind + EMQX Operator.
+Roadmap: published trackers (FastTracker, UCMCTrack, TrackTrack) on real footage through the MOT bridge, scored with TrackEval; phantom boxes (lane markings inside the zone, boxes between side-by-side vehicles), entry/exit net-balance reconciliation, broker drain test on kind + EMQX Operator.
 
 ## Design notes
 
