@@ -117,6 +117,39 @@ def test_folders_are_merged_and_empty_csv_is_fine(tmp_path):
     assert [(t.frame, t.track_id) for t in tracks] == [(0, 1), (1, 1)]
 
 
+def test_object_ids_are_per_batch_and_the_same_car_is_linked_across_the_boundary(tmp_path):
+    # MTID numbers Object IDs per annotation batch: the same car is 205 up to frame 999 and 201 from frame 1000
+    root = _write(tmp_path / "Infrastructure", {
+        "0": [_row(f, 205, "Car", _rect(100 + 2 * (f - 990), 300)) for f in (998, 999)],
+        "1000": [_row(f, 201, "Car", _rect(100 + 2 * (f - 990), 300)) for f in (1000, 1001)]})
+    tracks, stats = m2g.convert(root)
+    assert len({t.track_id for t in tracks}) == 1
+    assert stats["batch_links"] == 1
+
+
+def test_same_object_id_in_the_next_batch_is_a_different_vehicle(tmp_path):
+    root = _write(tmp_path / "Infrastructure", {
+        "0": [_row(f, 200, "Car", _rect(100, 300)) for f in (998, 999)],
+        "1000": [_row(f, 200, "Van", _rect(700, 100)) for f in (1000, 1001)]})
+    tracks, stats = m2g.convert(root)
+    assert len({t.track_id for t in tracks}) == 2  # no overlap across the boundary: not linked
+    assert stats["batch_links"] == 0
+
+
+def test_gap_equal_to_gap_frames_keeps_the_identity(tmp_path):
+    rows = [_row(1, 500, "Car", _rect(100, 300)), _row(4, 500, "Car", _rect(106, 300))]  # 2 unannotated frames
+    tracks, stats = m2g.convert(_write(tmp_path / "Infrastructure", {"0": rows}), gap_frames=2)
+    assert len({t.track_id for t in tracks}) == 1 and stats["gap_splits"] == 0
+
+
+def test_jump_is_measured_at_the_footpoint_not_the_box_centre(tmp_path):
+    # the box grows 200 px upward in one frame (a lorry entering): centre jumps 100 px, footpoint stays put
+    rows = [_row(1, 600, "Lorry", [100, 300, 180, 300, 180, 330, 100, 330]),
+            _row(2, 600, "Lorry", [100, 100, 180, 100, 180, 330, 100, 330])]
+    tracks, stats = m2g.convert(_write(tmp_path / "Infrastructure", {"0": rows}), max_jump_px=85)
+    assert len({t.track_id for t in tracks}) == 1 and stats["jump_splits"] == 0
+
+
 def test_bad_rows_fail_loud(tmp_path):
     odd = _write(tmp_path / "odd", {"0": [_row(1, 200, "Car", [1, 2, 3])]})
     with pytest.raises(ValueError, match="annotations.csv:2"):
@@ -138,6 +171,6 @@ def test_main_writes_gt_jsonl_and_prints_stats(tmp_path, monkeypatch, capsys):
     assert len(rows) == 8 and len({r.track_id for r in rows}) == 3
     printed = capsys.readouterr().out
     assert "8 boxes, 3 identities" in printed
-    assert "1 of 3 Object IDs reused" in printed
+    assert "1 of 3 per-batch Object IDs reused" in printed
     assert "3 cyclist boxes excluded" in printed
     assert "0 on a footpoint jump over 85 px/frame" in printed

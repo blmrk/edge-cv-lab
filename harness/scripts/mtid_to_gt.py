@@ -14,21 +14,25 @@ media/sample.mp4. The last field is the object's outline as x y pairs; the box i
 Tags: Car, Van, Lorry, Bus, Cyclist. Cyclists are excluded by default because scripts/dump_detections.py keeps
 only COCO car, bus and truck, so a tracker on those detections can never follow a cyclist.
 
-Object IDs are reused: a number that belonged to one vehicle is later given to another. A reappearance after more
-than --gap-frames unannotated frames therefore starts a new identity. Identities are numbered from 1 in order of
-first appearance. The default gap comes from the real annotations (run this script; it prints the gap line):
+Object IDs are numbered per annotation batch (one sub-folder each; numbering restarts at 200 in every batch), so an
+identity is keyed by (batch, Object ID). A vehicle on screen across a batch boundary gets a new ID in the next batch;
+it is rejoined when its box on the batch's last frame overlaps (IoU >= LINK_IOU) its box on the next batch's first
+frame. On the real annotations that rejoins 12 vehicles.
+
+Within a batch, IDs are also reused: a number that belonged to one vehicle is later given to another. A reappearance
+after more than --gap-frames unannotated frames therefore starts a new identity. The default gap comes from the real
+annotations (run this script; it prints the gap line):
   - every frame from the first to the last annotated one has at least one annotated object, so there are no
     unannotated-frame runs to bridge;
-  - within an Object ID there are 53 reappearances after a gap, the shortest 1 frame and the longest 1646;
-  - each of those 53 is a different vehicle: the box comes back at another place in the image, not where it left.
+  - within a batch's Object ID there are 9 reappearances after a gap, the shortest 4 frames and the longest 419;
+  - each is a different vehicle: the box comes back at another place in the image, not where it left.
 So any gap means reuse, and the default splits on any unannotated frame (0). A larger value only helps footage
 where a visible vehicle is left unannotated for a few frames.
 
-Some IDs are reused with no gap at all (mostly where one annotation batch hands over to the next), which no gap
-setting can split. So an Object ID also starts a new identity when its footpoint (bottom-centre of the box) moves
-more than --max-jump-px per frame elapsed. The script prints the fastest step it kept and the slowest it split;
-on the real annotations with the defaults those are 65.5 px/frame (a bus whose box widens as it enters the frame)
-and 104.6 px/frame, over 6 jump splits. The default, 85, sits about halfway between the two.
+An ID can also be reused with no gap, which no gap setting can split. So an identity also starts anew when its
+footpoint (bottom-centre of the box) moves more than --max-jump-px per frame elapsed. The script prints the fastest
+step it kept and the slowest it split; on the real annotations with the defaults those are 65.5 px/frame (a bus whose
+box widens as it enters the frame) and 199.6 px/frame, over 2 jump splits. The default, 85, sits between the two.
 Licence: MTID is CC BY 4.0 (see media/SOURCES.md). The annotations are not committed.
 """
 from __future__ import annotations
@@ -47,6 +51,7 @@ from replay.schema import TrackBox  # noqa: E402
 FPS = 30
 GAP_FRAMES = 0
 MAX_JUMP_PX = 85.0
+LINK_IOU = 0.3  # box overlap that rejoins one vehicle across an annotation-batch boundary
 EXCLUDE = ("Cyclist",)
 _FRAME = re.compile(r"(\d+)\.\w+$")
 
@@ -56,6 +61,7 @@ class _Row(NamedTuple):
     oid: int  # MTID Object ID, reused across vehicles
     tag: str
     bbox: tuple[float, float, float, float]
+    batch: str = ""  # annotation sub-folder: Object IDs are numbered per batch
 
 
 def read_rows(root: Path) -> list[_Row]:
@@ -82,7 +88,7 @@ def read_rows(root: Path) -> list[_Row]:
                                      f"(first at {seen[frame, oid]})")
                 seen[frame, oid] = where
                 xs, ys = xy[0::2], xy[1::2]
-                rows.append(_Row(frame, oid, parts[3], (min(xs), min(ys), max(xs), max(ys))))
+                rows.append(_Row(frame, oid, parts[3], (min(xs), min(ys), max(xs), max(ys)), csv.parent.name))
     return rows
 
 
@@ -94,12 +100,12 @@ def _speed(a: _Row, b: _Row) -> float:
 
 def split_identities(rows: list[_Row], gap_frames: int = GAP_FRAMES, max_jump_px: float = MAX_JUMP_PX):
     """Cut each Object ID's rows into one segment per vehicle."""
-    by_id: dict[int, list[_Row]] = defaultdict(list)
+    by_id: dict[tuple[str, int], list[_Row]] = defaultdict(list)
     for r in rows:
-        by_id[r.oid].append(r)
+        by_id[r.batch, r.oid].append(r)  # the same number in another batch is another vehicle
     segments: list[list[_Row]] = []
     gaps: list[int] = []
-    reused: set[int] = set()
+    reused: set[tuple[str, int]] = set()
     gap_splits = jump_splits = 0
     kept_max, split_min = 0.0, None
     for oid, rs in by_id.items():
@@ -130,10 +136,49 @@ def split_identities(rows: list[_Row], gap_frames: int = GAP_FRAMES, max_jump_px
     return segments, stats
 
 
+def _iou(a, b) -> float:
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - ix * iy
+    return ix * iy / union if union > 0 else 0.0
+
+
+def link_batches(segments: list[list[_Row]], min_iou: float = LINK_IOU) -> int:
+    """Object IDs restart in every annotation batch, so a vehicle on screen across a batch boundary has two IDs.
+    Rejoin a segment ending on a batch's last frame with one starting on the next batch's first frame when their
+    boxes overlap (best overlap first). Edits segments in place; returns the number of links."""
+    span: dict[str, tuple[int, int]] = {}
+    for seg in segments:
+        for r in (seg[0], seg[-1]):
+            lo, hi = span.get(r.batch, (r.frame, r.frame))
+            span[r.batch] = (min(lo, r.frame), max(hi, r.frame))
+    order = sorted(span, key=lambda b: span[b][0])
+    links = 0
+    for b1, b2 in zip(order, order[1:]):
+        last, first = span[b1][1], span[b2][0]
+        if first != last + 1:
+            continue
+        ends = [s for s in segments if s[-1].batch == b1 and s[-1].frame == last]
+        starts = [s for s in segments if s[0].batch == b2 and s[0].frame == first]
+        pairs = sorted(((_iou(e[-1].bbox, st[0].bbox), i, j) for i, e in enumerate(ends) for j, st in enumerate(starts)),
+                       reverse=True)
+        used_e, used_s = set(), set()
+        for v, i, j in pairs:
+            if v < min_iou or i in used_e or j in used_s:
+                continue
+            used_e.add(i), used_s.add(j)
+            ends[i].extend(starts[j])
+            starts[j].clear()
+            links += 1
+        segments[:] = [s for s in segments if s]
+    return links
+
+
 def convert(root: Path, fps: float = FPS, gap_frames: int = GAP_FRAMES, exclude=EXCLUDE,
             max_jump_px: float = MAX_JUMP_PX):
     rows = read_rows(root)
     segments, stats = split_identities(rows, gap_frames, max_jump_px)
+    stats["batch_links"] = link_batches(segments)
     frames = {r.frame for r in rows}
     stats["unannotated_frames"] = (max(frames) - min(frames) + 1 - len(frames)) if frames else 0
     stats["frame_range"] = (min(frames) + 1, max(frames) + 1) if frames else (0, 0)  # MTID numbering
@@ -168,7 +213,8 @@ def main():
     n_ids = len({t.track_id for t in tracks})
     left_out = "/".join(x.lower() for x in a.exclude) or "no"
     print(f"{out}.gt.jsonl: {len(tracks)} boxes, {n_ids} identities, {s['excluded_boxes']} {left_out} boxes excluded")
-    print(f"{s['reused_ids']} of {s['object_ids']} Object IDs reused, split {s['gap_splits'] + s['jump_splits']} "
+    print(f"{s['batch_links']} vehicles rejoined across annotation batches (IoU >= {LINK_IOU:g} at the boundary frame)")
+    print(f"{s['reused_ids']} of {s['object_ids']} per-batch Object IDs reused, split {s['gap_splits'] + s['jump_splits']} "
           f"times: {s['gap_splits']} after more than {a.gap_frames} unannotated frames, "
           f"{s['jump_splits']} on a footpoint jump over {a.max_jump_px:g} px/frame")
     slowest = s["split_min_px_per_frame"]
