@@ -63,7 +63,7 @@ services:
       DEVICE_ID: edge-01
       MQTT_HOST: toxiproxy
       TRACKER: bytetrack.yaml
-      ZONE_POLYGON: "[[400,200],[800,200],[800,600],[400,600]]"
+      ZONE_POLYGON: "[[552,112],[334,235],[882,581],[1020,277]]"  # = harness/zone.json, drawn in tools/label.html on media/sample.mp4
     mem_limit: 2g   # lower this to reproduce OOM crash loops
     restart: unless-stopped
 
