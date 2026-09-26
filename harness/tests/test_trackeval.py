@@ -47,3 +47,20 @@ def test_trackeval_scores_perfect_tracks_one_and_counts_a_switch():
     assert res["perfect"]["IDSW"] == 0
     assert res["switched"]["IDSW"] == 1
     assert res["switched"]["IDF1"] == pytest.approx(0.75)  # car 1 keeps its best ID for 5 of 10 frames
+
+
+def test_tracks_names_may_hold_an_equals_sign(tmp_path, monkeypatch, capsys):
+    import sys
+    spec = importlib.util.spec_from_file_location("trackeval_run", SCRIPT)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    (tmp_path / "t.jsonl").write_text('{"frame": 0, "ts_ms": 0, "track_id": 1, "bbox": [0, 0, 10, 10]}\n')
+    seen = {}
+    monkeypatch.setattr(mod, "evaluate", lambda gt, runs, _: seen.update(runs) or {
+        n: dict.fromkeys(mod.COLS, 0) for n in runs})
+    monkeypatch.setattr(sys, "argv", ["trackeval_run.py", "--gt", str(tmp_path / "t.jsonl"),
+                                      "--tracks", f"greedy_iou:max_age=5={tmp_path / 't.jsonl'}"])
+
+    mod.main()
+
+    assert list(seen) == ["greedy_iou:max_age=5"]

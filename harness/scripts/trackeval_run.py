@@ -74,7 +74,7 @@ def main():
     a = ap.parse_args()
     runs = {}
     for spec in a.tracks:
-        name, sep, path = spec.partition("=")
+        name, sep, path = spec.rpartition("=")  # last "=": tracker names like greedy_iou:max_age=5 hold one
         if not sep:
             ap.error(f"--tracks takes NAME=PATH, got {spec!r}")
         runs[name] = list(read_tracks(path))
