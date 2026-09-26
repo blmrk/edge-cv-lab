@@ -1,6 +1,7 @@
 # Case study: counting vehicles once
 
-> Status: measured on one public clip. Every figure comes from a command in Reproduce; nothing is estimated.
+> Status: measured on one public clip. Every measured figure comes from a command in Reproduce; the labelling passes
+> behind the ground truth are described under Ground truth.
 
 ## Problem
 
@@ -31,7 +32,7 @@ Zone-based vehicle analytics report inflated visit counts and wrong dwell times,
 | Precision / recall / F1 of visits (`replay.score`, 2 s tolerance) | 0.167 / 0.929 / 0.283 | 0.359 / 1.0 / 0.528 |
 | Tracks with more than one enter | 0 | 0 |
 | Net balance (enters minus exits) | 66 | 3 |
-| ID switches (`replay.compare --gt`) / IDF1 / HOTA (TrackEval) | 110 / 0.257 / 0.218 | 110 / 0.257 / 0.218 |
+| ID switches (`replay.compare --gt`) / IDF1 / HOTA (TrackEval) | 110 / 0.263 / 0.221 | 110 / 0.263 / 0.221 |
 
 ID switches are counted against ground-truth tracks built from the dataset's own annotations (`mtid_to_gt.py`), on the
 20.5% of ground-truth boxes a ByteTrack box overlaps at IoU 0.5 or more. Coverage is low: much of the annotated traffic runs
@@ -39,17 +40,17 @@ along the top of the frame, partly under the burned-in timestamp band, where few
 from TrackEval on the same ground truth (tables below); the counter does not change the tracks, so both columns match.
 
 No track re-enters the zone. `replay.score --explain` lists each of the debounced counter's 39 enters with how far its
-track's footpoint ever moved, and they fall in two groups with nothing between: 18 from tracks that moved at most 6 px,
-boxes about 23x15 px with mean scores 0.17 to 0.31, and 21 from tracks that moved at least 355 px. Drawn on a frame, the
-first group sits on the white dashes of the bike lane that crosses the zone: at `conf` 0.1 the detector scores lane
-markings as cars, and ByteTrack keeps them as parked tracks. They are 13 of the 25 false visits, and 5 more are
-"matched" only because they fall within 2 s of a labelled visit, so time-only matching flatters recall. The other 12
-false visits are moving vehicles: new track IDs for vehicles already counted, or vehicles the labelling passes left out
-(not separated here). Phantom boxes get their own case study; this one keeps the detector's threshold as it is. The
+track's footpoint ever moved, and they fall in two groups with nothing between: 18 tracks moved at most 6 px, with boxes
+22 to 34 px wide and 14 to 24 px tall at mean scores 0.17 to 0.31, and 21 moved at least 355 px. Drawn on a frame, the
+first group sits on the white dashes of the bike lane that crosses the zone: the detector scores lane markings as cars
+at low confidence, and ByteTrack keeps them as parked tracks (Ultralytics' defaults start a track at score 0.25 and keep
+it on boxes down to 0.1). Scored on their own, the 21 moving enters match all 14 labelled visits with 7 false (F1 0.8,
+against 0.528 with the phantoms). So 18 of ByteTrack's 25 extra visits are phantoms and 7 are moving vehicles with no
+label within 2 s. Phantom boxes get their own case study; this one keeps the detector's threshold as it is. The
 debounced counter still removes most of the naive counter's excess.
 
-The GIF in the README (`docs/footage/real-compare.gif`, `make footage`) shows two of the trackers below over the busiest
-13 s of the clip, IDs as coloured tags.
+The GIF in the README (`docs/footage/real-compare.gif`, `make footage`) shows two of the trackers below over 13 s of the
+clip from 20 s, IDs as coloured tags.
 
 ## Fixes, one at a time
 
@@ -60,7 +61,7 @@ The GIF in the README (`docs/footage/real-compare.gif`, `make footage`) shows tw
 | + hysteresis (5 in / 8 out) | +392.9% (69) | |
 | + edge margin (10 px) | +364.3% (65) | parked on the zone edge |
 | + min dwell 1 s, cooldown 1.5 s | +178.6% (39) | largest single step: fragment tracks shorter than a second no longer count |
-| + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | table below | best here: `greedy_iou:max_age=5`, 21 vs 14 |
+| + tracker swap (see docs/trackers.md): `replay.compare` row per tracker | table below | best count here: `greedy_iou:max_age=5`, 21 vs 14, mostly from its 0.3 score floor (below) |
 | + class-agnostic NMS (detector) | +85.7% (26) | `greedy_iou:max_age=5`: count 21 to 26, worse (see below), but F1 0.686 to 0.7, missed visits 2 to 0, ID switches 368 to 68 |
 
 The counter rows above are ByteTrack tracks, steps added cumulatively (`replay.ablation`, command in Reproduce):
@@ -83,11 +84,12 @@ The same steps on `greedy_iou:max_age=5` tracks, the best tracker below, which s
 | + edge margin (10 px) | 79 | +464.3% | 14 | 65 | 0 | 0.301 |
 | + min dwell 1 s, cooldown 1.5 s | 21 | +50.0% | 12 | 9 | 2 | 0.686 |
 
-Its many fragments are short, so the minimum dwell removes most of them, and it keeps fewer lane-marking phantoms
-than ByteTrack (below); that is why it ends up best.
+Its many fragments are short, so the minimum dwell removes most of them, and its 0.3 score floor keeps most lane-marking
+phantoms out (below); that is why it ends up best.
 
 Tracker swap on the same detections, debounced counter, identity against the annotated tracks (`replay.compare --gt`,
-commands in Reproduce):
+commands in Reproduce). The harness trackers drop boxes scored under 0.3 before association (`min_score`); ByteTrack
+uses boxes down to 0.1:
 
 | tracker | labelled | predicted | missed visits | false visits | f1 | id switches | id transfers | pred ids | gt objects | gt boxes matched pct |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -97,25 +99,26 @@ commands in Reproduce):
 | bytetrack | 14 | 39 | 0 | 25 | 0.528 | 110 | 0 | 194 | 65 | 20.5 |
 
 The same tracks scored by TrackEval (`scripts/trackeval_run.py`, TrackEval 12c8791; HOTA, DetA and AssA are means over
-IoU 0.05 to 0.95, the rest at IoU 0.5):
+IoU 0.05 to 0.95, the rest at IoU 0.5; only the annotated frames, 1 to 3099, are scored):
 
 | tracker | HOTA | DetA | AssA | IDF1 | MOTA | IDSW |
 |---|---|---|---|---|---|---|
-| greedy_iou:max_age=5 | 0.153 | 0.132 | 0.179 | 0.164 | -0.111 | 205 |
-| greedy_iou | 0.160 | 0.132 | 0.193 | 0.174 | -0.109 | 184 |
-| groundplane | 0.179 | 0.132 | 0.245 | 0.213 | -0.106 | 127 |
-| bytetrack | 0.218 | 0.137 | 0.347 | 0.257 | -0.132 | 16 |
+| greedy_iou:max_age=5 | 0.155 | 0.135 | 0.179 | 0.167 | -0.081 | 205 |
+| greedy_iou | 0.161 | 0.135 | 0.193 | 0.178 | -0.080 | 184 |
+| groundplane | 0.182 | 0.135 | 0.246 | 0.217 | -0.077 | 127 |
+| bytetrack | 0.221 | 0.141 | 0.347 | 0.263 | -0.100 | 16 |
 
-The absolute scores are low because detection is: DetA 0.13 against the annotated vehicles, and MOTA is negative, so
-misses, false positives and switches together outnumber the ground-truth boxes. The two switch counts differ by definition. The harness counts a
+The absolute scores are low because detection is: DetA 0.135 to 0.141 against the annotated vehicles, and MOTA is
+negative, so misses, false positives and switches together outnumber the ground-truth boxes. The two switch counts differ by definition. The harness counts a
 switch whenever the per-frame greedy match of a ground-truth vehicle changes predicted ID, so two overlapping boxes on
 one vehicle can alternate and count one each time; TrackEval's CLEAR matching gives the previous pairing priority, so
 it counts fewer (16 against 110 for ByteTrack). Both rank ByteTrack first on identity.
 
-The two rankings disagree. ByteTrack keeps identities best yet counts visits worst, and `--explain` says why: 18 of its
-39 enters are lane-marking phantoms, against 4 of 21 for `greedy_iou:max_age=5`. On moving tracks alone the two are
-close, 21 and 17 enters. The short-buffer tracker counts best because its fragments are too short to pass the minimum
-dwell and it keeps fewer phantoms, not because it tracks better.
+The two rankings disagree, and `--explain` says why. ByteTrack keeps identities best yet counts worst because it keeps
+the lane-marking phantoms: 18 of its 39 enters, against 4 of 21 for `greedy_iou:max_age=5`. That gap is the score
+floor, not the association: 14090 of the 21902 detections score under 0.3, and with `min_score=0.1` the same tracker
+logs 121 enters, 95 of them static. On moving enters alone ByteTrack counts better too, F1 0.8 against 0.774. The
+tracker swap mostly swaps the score floor.
 
 ### Detector fix: class-agnostic NMS
 
@@ -139,10 +142,10 @@ balance from 66 to 50. TrackEval agrees on the direction:
 
 | tracker | HOTA | DetA | AssA | IDF1 | MOTA | IDSW |
 |---|---|---|---|---|---|---|
-| greedy_iou:max_age=5 | 0.199 | 0.135 | 0.294 | 0.223 | -0.075 | 66 |
-| greedy_iou | 0.204 | 0.135 | 0.308 | 0.234 | -0.074 | 44 |
-| groundplane | 0.204 | 0.135 | 0.310 | 0.240 | -0.073 | 38 |
-| bytetrack | 0.221 | 0.140 | 0.349 | 0.263 | -0.112 | 9 |
+| greedy_iou:max_age=5 | 0.202 | 0.138 | 0.296 | 0.227 | -0.048 | 66 |
+| greedy_iou | 0.206 | 0.138 | 0.309 | 0.238 | -0.046 | 44 |
+| groundplane | 0.207 | 0.137 | 0.312 | 0.244 | -0.046 | 38 |
+| bytetrack | 0.224 | 0.143 | 0.350 | 0.268 | -0.082 | 9 |
 
 Its switch counts fall from 205, 184, 127 and 16 to 66, 44, 38 and 9, and IDF1 and HOTA rise for every tracker, most
 for the harness trackers. The fix shows up in identity far more than in counting, and the rankings still disagree:
@@ -180,16 +183,18 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
 - The visit ground truth rests on three passes, two of them by an AI model reading contact sheets; the third comes from
   the dataset's own annotations. They found 14, 12 and 20 visits, and a visit counts when two of three include it.
 - Visits are matched on enter time alone (2 s tolerance), so an enter from the wrong object can take a labelled visit's
-  match: 5 of ByteTrack's matches are lane-marking phantoms.
-- Identity metrics only see the annotated vehicles the detector finds: about 20% of ground-truth boxes are matched, and
-  DetA is 0.13 to 0.14.
+  match. The totals stay right; to see which enters are real, `--explain` scores the moving enters on their own.
+- Identity metrics only see the annotated vehicles the detector finds: 18 to 21% of ground-truth boxes are matched, and
+  DetA is 0.135 to 0.143.
+- The harness trackers and ByteTrack use different score floors (0.3 and 0.1), so the tracker comparison mixes
+  association with detection filtering.
 - CPU-only `yolov8n` at `conf` 0.1; a larger model or a higher threshold would change the detections, and every number
   after them.
 
 ## Reproduce
 
 ```bash
-pip install -e "harness[dev]"   # scoring; detection runs in the edge image that `make up-video` builds
+pip install -e "harness[dev,trackeval]"   # scoring; detection runs in the edge image that `make up-video` builds
 docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
   python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --per-class-nms --out runs/dets.jsonl
 docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
@@ -212,6 +217,9 @@ python -m replay.track --dets runs/dets.jsonl --tracker groundplane --param 'lan
 python -m replay.compare --dets runs/dets.jsonl --zone zone.json --truth truth.json --tracks groundplane_diagonal=runs/groundplane_diag.jsonl
 python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json --explain
 python -m replay.score --tracks runs/greedy_iou_5.jsonl --zone zone.json --truth truth.json --explain
+python -c "from replay.detections import read_detections as r; d = list(r('runs/dets.jsonl')); print(len(d), sum(x.score < 0.3 for x in d))"
+python -m replay.track --dets runs/dets.jsonl --tracker greedy_iou --param max_age=5 --param min_score=0.1 --out runs/greedy_iou_5_s01.jsonl
+python -m replay.score --tracks runs/greedy_iou_5_s01.jsonl --zone zone.json --truth truth.json --explain
 # TrackEval, cloned once at the pinned commit (MIT); the runner reads it from ../.cache/TrackEval
 git clone https://github.com/JonathonLuiten/TrackEval ../.cache/TrackEval && git -C ../.cache/TrackEval checkout 12c8791
 python -m replay.track --dets runs/dets.jsonl --tracker greedy_iou --out runs/greedy_iou.jsonl
