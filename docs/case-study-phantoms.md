@@ -133,9 +133,10 @@ boxes), ByteTrack replayed on them, and a zone fixed before counting: a band acr
 
 The flags are candidates, not phantoms: they also catch a real vehicle seen in the gap between two nearer ones. Tracks
 decide what gets counted, and only 6 of the 52 enters' tracks carry any flagged box, none of them for half its boxes.
-So each enter was checked by eye: `replay.between --sheet` crops every enter's box at the frame it entered, and three
-model-assisted visual passes (an AI model reading the sheets, each pass run separately) labelled each crop. A crop
-counts as a straddle when at least two passes say so.
+So each enter was checked visually: `replay.between --sheet` crops every enter's box at the frame it entered, and three
+model-assisted visual passes (an AI model reading the sheets, each pass run separately) labelled each crop, kept in the
+gitignored `harness/runs/gap.passes.json` as the counting study keeps its labels in `truth.json`. A crop counts as a
+straddle when at least two passes say so.
 
 - 2 of the 52 enters sit on a box straddling two vehicles side by side: tracks 1033 (all three passes: the upper half of
   a box truck and the car beside it) and 451 (two passes: a hatchback and half of the SUV next to it, both of which
@@ -181,8 +182,10 @@ mostly covered by two higher-scoring boxes) needs a dense clip with visit labels
 ## Reproduce
 
 ```bash
-pip install -e "harness[dev,trackeval,viz]"   # scoring and sheets; detection and ByteTrack run in the edge image (`make up-video` builds it)
-e() { docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge "$@"; }   # the edge image, CPU only
+setopt interactive_comments 2>/dev/null || true
+# scoring and sheets run locally; detection and ByteTrack run in the edge image, CPU only (make up-video builds it)
+pip install -e "harness[dev,trackeval,viz]"
+e() { docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge "$@"; }
 e python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --out runs/dets.agnostic.jsonl
 e python scripts/dump_tracks.py --video ../media/sample.mp4 --model /app/yolov8n.pt --tracker bytetrack.yaml --out runs/bytetrack.agnostic.jsonl
 e python -c "import ultralytics; print(ultralytics.__version__)"
@@ -274,4 +277,6 @@ for tid in (451, 1033):
         k = sum(iou(src.bbox, d.bbox) < 0.5 for d in near)
         c['fewer than two other boxes cover a fifth of it' if k < 2 else 'two or more do, but no side-by-side pair'] += bridge(replace(src, score=-1.0), by[t.frame]) is None
     print(tid, dict(c))"
+# the three visual passes (gitignored labels, one entry per enter of the default run)
+python -c "import json; e = json.load(open('runs/gap.passes.json'))['enters']; print(len(e), 'enters | straddle, 2+ of 3:', [(x['track_id'], x['labels'].count('straddle')) for x in e if x['labels'].count('straddle') >= 2], '| single in all 3:', sum(x['labels'] == ['single'] * 3 for x in e), '| other:', [(x['track_id'], x['labels']) for x in e if x['labels'] != ['single'] * 3 and x['labels'].count('straddle') < 2])"
 ```
