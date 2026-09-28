@@ -47,8 +47,8 @@ at low confidence, and ByteTrack keeps them as parked tracks (Ultralytics' defau
 it on boxes down to 0.1). Scored on their own, the 21 moving enters match all 14 labelled visits with 7 false (F1 0.8,
 against 0.528 with the phantoms). So 18 of ByteTrack's 25 extra visits are phantoms, and 7 are moving enters with no
 labelled visit left to match: vehicles the labels do not count, or a second vehicle entering close to one that took
-the label. Phantom boxes get their own case study; this one keeps the detector's threshold as it is. The
-debounced counter still removes most of the naive counter's excess.
+the label. Phantom boxes get their own case study, [case-study-phantoms.md](case-study-phantoms.md), where a zone rule
+removes all 18; this one keeps them. The debounced counter still removes most of the naive counter's excess.
 
 The GIF in the README (`docs/footage/real-compare.gif`, `make footage`) shows two of the trackers below over 13 s of the
 clip from 20 s, IDs as coloured tags.

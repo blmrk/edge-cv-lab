@@ -47,7 +47,10 @@ it in `trackers/__init__.py::_load`. `update` is called for every frame in order
 
 **A Python package.** See `boxmot_adapter.py`, which exposes `boxmot_bytetrack` and `boxmot_ocsort`.
 It is not exercised in CI because boxmot depends on torch. Appearance-based trackers need real frames,
-so they cannot run from a detections file alone.
+so they cannot run from a detections file alone. `bytetrack.py` wraps Ultralytics' own `BYTETracker`, so
+ByteTrack variants (`--param new_track_thresh=0.4`) and detection filters run on saved detections in seconds instead
+of a video run. It needs ultralytics, so run it in the edge image; its fidelity to the video run is measured in
+[case-study-phantoms.md](case-study-phantoms.md).
 
 **Any research repo, no adapter code.** Most tracking papers read and write MOTChallenge text files:
 
