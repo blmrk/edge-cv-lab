@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from replay.metrics import summarize
-from replay.schema import read_tracks
+from replay.schema import TrackBox, read_tracks
 from replay.zones import DebouncedZoneCounter, NaiveZoneCounter, run
 
 FX = Path(__file__).resolve().parent.parent / "fixtures"
@@ -107,3 +107,32 @@ def test_explain_scores_moving_enters_alone_so_a_phantom_cannot_take_a_label():
     assert match([r["ts_ms"] for r in rows], [1600], 2000)["matched"] == 1  # one of the two enters takes the label
     assert summary["moving_vs_labels"] == match([r["ts_ms"] for r in rows if r["track_id"] == 1], [1600], 2000)
     assert (summary["moving_vs_labels"]["matched"], summary["moving_vs_labels"]["false_visits"]) == (1, 0)
+
+
+def test_min_travel_keeps_a_box_that_never_moved_from_entering():
+    # a lane marking scored as a car: a small box jittering a pixel or two on the spot inside the zone for 5 s
+    dash = [TrackBox(f, f * 1000 // 30, 1, (580 + f % 3, 380, 610 + f % 3, 400 + f % 2), 0.2, "car") for f in range(150)]
+    assert summarize(run(DebouncedZoneCounter(POLY), dash))["enters"] == 1  # the default still counts it
+    assert summarize(run(DebouncedZoneCounter(POLY, min_travel_px=20), dash))["enters"] == 0
+
+
+def test_min_travel_still_counts_a_car_that_drives_in_and_stops():
+    xs = list(range(300, 600, 10)) + [600] * 150  # drives in from outside, then stops in the zone until the end
+    car = [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400), 0.9, "car") for f, x in enumerate(xs)]
+    got = run(DebouncedZoneCounter(POLY, min_travel_px=20), car)
+    assert got == run(DebouncedZoneCounter(POLY), car)  # same events, same timestamps: it moved long before entering
+    assert summarize(got)["enters"] == 1
+
+
+def test_min_travel_never_counts_a_car_parked_in_the_zone_for_the_whole_clip():
+    # the trade-off: its arrival was never seen, and a parked car looks exactly like a phantom
+    parked = [TrackBox(f, f * 1000 // 30, 1, (555, 340, 645, 400), 0.9, "car") for f in range(150)]
+    assert summarize(run(DebouncedZoneCounter(POLY), parked))["enters"] == 1
+    assert summarize(run(DebouncedZoneCounter(POLY, min_travel_px=20), parked))["enters"] == 0
+
+
+def test_min_travel_counts_a_parked_car_that_drives_off_from_when_it_moved():
+    xs = [600] * 60 + list(range(605, 900, 5))  # parked for 2 s when its track starts, then leaves at 5 px a frame
+    car = [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400), 0.9, "car") for f, x in enumerate(xs)]
+    enters = [e for e in run(DebouncedZoneCounter(POLY, min_travel_px=20), car) if e.kind == "enter"]
+    assert [e.frame for e in enters] == [xs.index(620)]  # stamped once it had moved 20 px, not when the track started

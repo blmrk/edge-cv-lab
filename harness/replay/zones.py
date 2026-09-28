@@ -5,6 +5,7 @@ same track stream, so the difference is measurable on any recording.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Iterable, Literal
 
@@ -51,6 +52,8 @@ class _State:
     last_ts: int = 0
     last_frame: int = 0
     pending: ZoneEvent | None = field(default=None)
+    origin: tuple[float, float] | None = None  # anchor when the track was first seen
+    moved: bool = False
 
 
 class DebouncedZoneCounter:
@@ -70,6 +73,11 @@ class DebouncedZoneCounter:
     - lost_ms: a track that vanishes while inside (tracker dropped it, ID changed, object occluded)
       is closed after this long, stamped with the time it was last seen. Without this, a lost
       track is a visit that never ends.
+    - min_travel_px: an enter commits only once the anchor has moved at least this far from where the
+      track was first seen. A box that never moves (a lane marking scored as a car) never enters.
+      Trade-off: a vehicle already standing in the zone when its track starts counts only once it has
+      moved this far, stamped then (and dropped if it leaves within min_dwell_ms); one that never moves
+      never counts. Set it above the anchor jitter of a parked vehicle. 0, the default, turns it off.
     - anchor="footpoint": shadows and tall vehicles stretch the box, but move the ground
       contact point far less than the centroid.
     """
@@ -84,8 +92,9 @@ class DebouncedZoneCounter:
         cooldown_ms: int = 1500,
         lost_ms: int = 3000,
         margin_px: float = 10,
+        min_travel_px: float = 0,
     ):
-        self.polygon, self.anchor, self.margin_px = polygon, anchor, margin_px
+        self.polygon, self.anchor, self.margin_px, self.min_travel_px = polygon, anchor, margin_px, min_travel_px
         self.enter_frames, self.exit_frames = enter_frames, exit_frames
         self.min_dwell_ms, self.cooldown_ms, self.lost_ms = min_dwell_ms, cooldown_ms, lost_ms
         self._s: dict[int, _State] = {}
@@ -115,6 +124,8 @@ class DebouncedZoneCounter:
         s = self._s.setdefault(box.track_id, _State())
         s.last_ts, s.last_frame = box.ts_ms, box.frame
         pt = _anchor(box, self.anchor)
+        s.origin = s.origin or pt
+        s.moved = s.moved or math.dist(pt, s.origin) >= self.min_travel_px
         now = point_in_polygon(pt, self.polygon)
         if now != s.inside and distance_to_edge(pt, self.polygon) < self.margin_px:
             now = s.inside  # too close to the edge to count as evidence for the other side
@@ -127,6 +138,8 @@ class DebouncedZoneCounter:
         if now and s.streak >= self.enter_frames:
             if s.last_exit_ts is not None and box.ts_ms - s.last_exit_ts < self.cooldown_ms:
                 return []  # still cooling down; keep streak so it commits once allowed
+            if not s.moved:
+                return []  # has not moved yet; keep streak so it commits once it has
             s.inside, s.streak, s.entered_ts = True, 0, box.ts_ms
             # Hold the enter event until dwell is proven, so short visits emit nothing.
             s.pending = ZoneEvent("enter", box.track_id, box.ts_ms, box.frame)
