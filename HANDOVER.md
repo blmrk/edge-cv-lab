@@ -1,16 +1,16 @@
 # Handover
 
-Last updated 2026-09-26. Everything below has been run unless marked otherwise.
+Last updated 2026-09-28. Everything below has been run unless marked otherwise.
 
 ## Status
 
 | Piece | State |
 |---|---|
-| Replay harness, 92 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone |
+| Replay harness, 108 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
-| Tracker bench: greedy_iou, groundplane, ByteTrack (Ultralytics), MOT bridge, TrackEval runner | tested; **boxmot adapter untested** (needs torch) |
+| Tracker bench: greedy_iou, groundplane, ByteTrack (Ultralytics, from video or `bytetrack` on saved detections), MOT bridge, TrackEval runner | tested; **boxmot adapter untested** (needs torch) |
 | Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken |
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
 | Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
@@ -25,26 +25,22 @@ The repo's story is four field failures, each written up as its own case study u
 |---|---|---|
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
-| Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | next (task A) |
-| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | not started (task B) |
+| Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is found and counted, not fixed (task C) |
+| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | next (task B) |
 
 ## Task queue, in order
-
-### A. Phantom boxes case study
-- The counting study found the first kind already: 18 of ByteTrack's 39 debounced enters on the MTID clip are tracks
-  that never moved, on the bike lane's white dashes inside the zone (`replay.score --explain`). ByteTrack keeps them
-  because it tracks boxes down to score 0.1; the harness trackers drop boxes under 0.3 (`min_score`).
-- Candidate fixes, each measured as its own step like `replay.ablation`: a track must move before it can enter
-  (zone logic, so a test in `harness/tests/` first), a higher score to start a track, a minimum box size, a mask of
-  static detections learned from the empty scene. Watch that a real vehicle stopped in the zone still counts.
-- Find the second kind (a box between two vehicles side by side) on a public CCTV-angled clip; log it in
-  `media/SOURCES.md`.
-- Done: `docs/case-study-phantoms.md` with a before/after table and the counting study's phantom paragraph pointing to it.
 
 ### B. Zone enter/exit balance case study
 - Starting point: the naive counter's net balance (enters minus exits) is 66 on ByteTrack, the debounced counter's 3
   (`replay.cli`). Work out what a standing imbalance means per zone and how to reconcile it.
 - Done: `docs/case-study-balance.md` with measured figures and commands.
+
+### C. A fix for boxes straddling two side-by-side vehicles
+- Found on a dense expressway clip (`media/vecteezy-6434705.mp4`, metrics only): 2 of 52 zone enters sit on a box across
+  two vehicles, by three visual passes. The zone rule keeps both; a birth score of 0.5 removes one and 9 other enters
+  whose truth is unknown. `replay.between` flags candidates but misses a straddling box that outscores its neighbours.
+- Needs a dense clip with visit labels (`tools/label.html`) before any fix can be scored. Candidate: drop a box mostly
+  covered by two higher-scoring boxes, and check it keeps a car seen in the gap between two nearer ones.
 
 ### Deferred
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.
@@ -60,8 +56,17 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
 7. TrackEval on MTID (`scripts/trackeval_run.py`, TrackEval 12c8791 cloned to `.cache/`), not on DETRAC.
 9. Counting case study final pass: no placeholders; the per-class NMS baseline is kept, class-agnostic NMS is a later step.
 10. Repo polish: About, topics, social preview, Grafana screenshot.
+11. Phantom boxes case study (task A): `min_travel_px` zone rule (default 0, off in the edge and the sim), `bytetrack`
+    replay tracker, `replay.phantoms`, `replay.between`; `docs/case-study-phantoms.md`. CI actions bumped to v7, runner
+    pinned to ubuntu-24.04.
 
 ## Known rough edges
+- `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
+  on 2026-09-28; the image installs `ultralytics>=8.3` unpinned, so a rebuild can bring a release with another signature.
+- ByteTrack fails the queue fixture at its defaults (1 of 6 visits, 5 ID transfers): the phantom study's stopped-car
+  check runs on `groundplane` for that reason.
+- `DebouncedZoneCounter.min_travel_px` defaults to 0; the edge and the sim run without it. Its trade-off: a vehicle
+  standing in the zone when its track starts is counted only once it moves.
 - The counting study's baseline, ablation tables, first tracker table, the README's 78/39/21 and `real-compare.gif`
   use per-class NMS detections (`--per-class-nms`, runs/dets.jsonl). The dump scripts and the edge default to
   class-agnostic NMS.
