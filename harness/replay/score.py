@@ -38,15 +38,18 @@ def match(pred_ms: list[int], true_ms: list[int], tol_ms: int) -> dict:
             "count_error_pct": round(100 * (len(pred) - len(true)) / max(len(true), 1), 1)}
 
 
-def explain(boxes, poly, truth_ms: list[int], tol_ms: int = 2000, static_px: float = 30) -> tuple[list[dict], dict]:
+def explain(boxes, poly, truth_ms: list[int], tol_ms: int = 2000, static_px: float = 30,
+            **counter_kw) -> tuple[list[dict], dict]:
     """One row per debounced enter, in time order, describing its track; plus the moving enters scored on their own.
+    counter_kw goes to DebouncedZoneCounter (e.g. min_travel_px).
     travel_px is the diagonal of the box around every footpoint the track had: near 0 means it never moved.
     No per-row matched flag: time alone cannot say whether a label belongs to a parked phantom or to the vehicle
     that entered a moment later, so the moving enters (travel_px >= static_px) are matched against the labels alone."""
     by_id = defaultdict(list)
     for b in boxes:
         by_id[b.track_id].append(b)
-    enters = sorted((e for e in run(DebouncedZoneCounter(poly), boxes) if e.kind == "enter"), key=lambda e: e.ts_ms)
+    enters = sorted((e for e in run(DebouncedZoneCounter(poly, **counter_kw), boxes) if e.kind == "enter"),
+                    key=lambda e: e.ts_ms)
     rows = []
     for e in enters:
         tb = by_id[e.track_id]

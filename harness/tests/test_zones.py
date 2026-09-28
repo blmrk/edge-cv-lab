@@ -136,3 +136,13 @@ def test_min_travel_counts_a_parked_car_that_drives_off_from_when_it_moved():
     car = [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400), 0.9, "car") for f, x in enumerate(xs)]
     enters = [e for e in run(DebouncedZoneCounter(POLY, min_travel_px=20), car) if e.kind == "enter"]
     assert [e.frame for e in enters] == [xs.index(620)]  # stamped once it had moved 20 px, not when the track started
+
+
+def test_explain_passes_counter_settings_through():
+    from replay.score import explain
+    square = [(100, 100), (500, 100), (500, 500), (100, 500)]
+    car = [TrackBox(f, f * 100, 1, (10 * f - 20, 260, 10 * f + 20, 300)) for f in range(60)]
+    dash = [TrackBox(f, f * 100, 2, (280, 280, 320, 300), 0.2) for f in range(200, 241)]
+    boxes = sorted(car + dash, key=lambda b: (b.frame, b.track_id))
+    rows, _ = explain(boxes, square, truth_ms=[1100], min_travel_px=30)
+    assert [r["track_id"] for r in rows] == [1]  # the dash never moved, so it never entered
