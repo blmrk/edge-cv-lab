@@ -5,8 +5,11 @@ python -m replay.balance --tracks runs/bytetrack.agnostic.jsonl --zone zone.json
 Enters minus exits, counted up to a moment, is the counter's occupancy: the vehicles it says are inside. Two views:
   after the fact: every event placed at its own timestamp, as a store of events sees it once the stream is over
   live: every event placed when the counter emitted it, as a dashboard sees it at that moment
-They differ because the debounced counter holds each enter until its visit closes. With annotated tracks (--gt), both are
-scored frame by frame against true occupancy: the annotated vehicles whose footpoint is inside the zone.
+They differ because the debounced counter holds each enter until its visit closes, and learns that a track is gone only
+lost_ms after it was last seen. A third view skips events altogether:
+  gauge: the counter's own committed-inside visits whose track was seen in the last 500 ms (open_visits(seen_within_ms))
+With annotated tracks (--gt), all three are scored frame by frame against true occupancy: the annotated vehicles whose
+footpoint is inside the zone, over the annotated frames only.
 Each visit still open at the end gets a reason from its track's last box: inside at end (seen within lost_ms of the end,
 anchor inside), lost inside (anchor inside, gone for longer than lost_ms), or left (last seen outside the zone).
 One row per counter, from the naive counter to the debounced one, so each step's effect on the balance shows.
@@ -17,13 +20,14 @@ import argparse
 import bisect
 import json
 from collections import defaultdict
-from itertools import accumulate
+from itertools import accumulate, groupby
 
 from .geometry import point_in_polygon
 from .schema import read_tracks
 from .zones import DebouncedZoneCounter, NaiveZoneCounter, _anchor
 
 LOST_MS = 3000  # DebouncedZoneCounter's default lost_ms: the line between "inside at end" and "lost inside"
+GAUGE_MS = 500  # the gauge's "seen recently": 15 frames at 30 fps, well under lost_ms
 
 COUNTERS = [  # (name, anchor, factory)
     ("naive, centroid", "centroid", lambda p: NaiveZoneCounter(p, "centroid")),
@@ -45,6 +49,17 @@ def emitted(counter, boxes) -> list[tuple[int, object]]:
         last = b.ts_ms
     if hasattr(counter, "flush"):
         out += [(last, e) for e in counter.flush()]
+    return out
+
+
+def gauge(counter, boxes, seen_within_ms: int = GAUGE_MS) -> dict[int, int]:
+    """Committed-inside visits whose track was seen within seen_within_ms, after each frame's boxes. boxes: sorted."""
+    out = {}
+    for f, frame_boxes in groupby(boxes, key=lambda b: b.frame):
+        frame_boxes = list(frame_boxes)
+        for b in frame_boxes:
+            counter.update(b)
+        out[f] = len(counter.open_visits(frame_boxes[0].ts_ms, seen_within_ms=seen_within_ms))
     return out
 
 
@@ -105,8 +120,10 @@ def table(boxes, poly, truth=None) -> list[dict]:
             after = occupancy([(e.ts_ms, e) for e in events], frame_ts)
             now = occupancy(live, frame_ts)
             errs = [abs(after[f] - t) for f, t in scored]
+            g = gauge(make(poly), boxes) if hasattr(make(poly), "open_visits") else None
             row.update(occupancy_mae=round(sum(errs) / len(errs), 3), occupancy_max_error=max(errs),
                        live_mae=round(sum(abs(now[f] - t) for f, t in scored) / len(scored), 3),
+                       gauge_mae=round(sum(abs(g[f] - t) for f, t in scored) / len(scored), 3) if g else None,
                        end_counted=after[scored[-1][0]], end_true=scored[-1][1])
         rows.append(row)
     return rows

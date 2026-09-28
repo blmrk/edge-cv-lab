@@ -64,3 +64,13 @@ def test_occupancy_is_scored_only_over_the_annotated_frames():
     row = {r["counter"]: r for r in balance.table(boxes, SQUARE, truth)}["naive, centroid"]
     assert row["occupancy_mae"] == round(20 / 51, 3)  # frames 31-50 hold the lost car, 1 too many
     assert (row["end_counted"], row["end_true"]) == (2, 1)  # at frame 50, the last annotated one
+
+
+def test_gauge_counts_committed_visits_whose_track_was_seen_recently():
+    # the lost car (track 2, last seen at 3.0 s) leaves the gauge 0.5 s later, not when lost_ms runs out
+    boxes = _scene()
+    g = balance.gauge(DebouncedZoneCounter(SQUARE), boxes, seen_within_ms=500)
+    assert (g[14], g[15], g[35], g[36], g[100]) == (0, 2, 2, 1, 1)  # commits at frame 15; frame 36 is 3.6 s
+    rows = {r["counter"]: r for r in balance.table(boxes, SQUARE, balance.true_occupancy(boxes, SQUARE))}
+    assert rows["debounced"]["gauge_mae"] < rows["debounced"]["live_mae"]
+    assert rows["naive, centroid"]["gauge_mae"] is None  # the naive counter keeps no visit state to ask
