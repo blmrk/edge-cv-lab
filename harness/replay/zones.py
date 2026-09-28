@@ -159,9 +159,11 @@ class DebouncedZoneCounter:
             return self._close(box.track_id, s, box.ts_ms, box.frame)
         return []
 
-    def open_visits(self, now_ms: int) -> list[tuple[int, float]]:
-        """(track_id, seconds inside so far) for every track currently committed as inside."""
-        return [(tid, (now_ms - s.entered_ts) / 1000) for tid, s in self._s.items() if s.inside]
+    def open_visits(self, now_ms: int, seen_within_ms: int | None = None) -> list[tuple[int, float]]:
+        """(track_id, seconds inside so far) for every track currently committed as inside. seen_within_ms keeps only
+        tracks seen that recently: a live occupancy gauge that does not wait lost_ms for a track that has gone quiet."""
+        return [(tid, (now_ms - s.entered_ts) / 1000) for tid, s in self._s.items()
+                if s.inside and (seen_within_ms is None or now_ms - s.last_ts <= seen_within_ms)]
 
     def flush(self) -> list[ZoneEvent]:
         """End of stream: release enter events for tracks still inside."""

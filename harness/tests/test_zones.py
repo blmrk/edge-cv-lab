@@ -177,3 +177,15 @@ def test_enter_after_dwell_still_drops_a_visit_shorter_than_min_dwell():
     # crosses the zone at 30 px a frame: inside for about half a second, then fully out
     quick = [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400)) for f, x in enumerate(range(380, 1200, 30))]
     assert run(DebouncedZoneCounter(POLY), quick) == run(DebouncedZoneCounter(POLY, enter_after_dwell=True), quick) == []
+
+
+def test_open_visits_seen_within_drops_a_visit_whose_track_went_quiet():
+    # the car drives in, then its track stops; a second car keeps the stream going
+    lost = [TrackBox(f, f * 100, 1, (x - 45, 340, x + 45, 400)) for f, x in enumerate(range(300, 610, 10))]
+    other = [TrackBox(f, f * 100, 2, (-200, 340, -110, 400)) for f in range(31, 50)]  # outside the zone
+    c = DebouncedZoneCounter(POLY)
+    for b in lost + other[:5]:  # up to 3.5 s: track 1 last seen at 3.0 s
+        c.update(b)
+    assert [tid for tid, _ in c.open_visits(3500)] == [1]  # still open: lost_ms has not run out
+    assert [tid for tid, _ in c.open_visits(3500, seen_within_ms=500)] == [1]  # seen 0.5 s ago: still counted
+    assert c.open_visits(3600, seen_within_ms=500) == []  # 0.6 s since it was seen: no longer counted
