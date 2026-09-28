@@ -31,6 +31,8 @@ COUNTERS = [  # (name, anchor, factory)
     ("debounced, no lost-track close", "footpoint", lambda p: DebouncedZoneCounter(p, lost_ms=10**12)),
     ("debounced", "footpoint", lambda p: DebouncedZoneCounter(p)),
     ("debounced + zone rule 30 px", "footpoint", lambda p: DebouncedZoneCounter(p, min_travel_px=30)),
+    ("debounced + zone rule 30 px + enter after dwell", "footpoint",
+     lambda p: DebouncedZoneCounter(p, min_travel_px=30, enter_after_dwell=True)),
 ]
 
 

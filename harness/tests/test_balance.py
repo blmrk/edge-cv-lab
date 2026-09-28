@@ -53,6 +53,8 @@ def test_table_scores_each_counter_against_true_occupancy():
     assert rows["debounced"]["end_counted"] == rows["debounced"]["end_true"] == 1
     # live, the debounced counter has emitted no enter for a car still inside, so it lags the truth more than after the fact
     assert rows["debounced"]["live_mae"] > rows["debounced"]["occupancy_mae"]
+    # releasing the enter once dwell is proven lets the live view see the car that is still inside
+    assert rows["debounced + zone rule 30 px + enter after dwell"]["live_mae"] < rows["debounced"]["live_mae"]
 
 
 def test_occupancy_is_scored_only_over_the_annotated_frames():
