@@ -46,15 +46,21 @@ def test_min_area_drops_boxes_smaller_than_the_threshold():
 
 
 def test_table_has_a_row_per_step_and_counts_the_queue_cars_that_stop(monkeypatch):
-    # bytetrack needs ultralytics; groundplane stands in, so this checks the table, not ByteTrack
-    monkeypatch.setattr(phantoms, "create", lambda name, **params: create("groundplane"))
-    dets = read_detections(FX / "queue.dets.jsonl")
+    # bytetrack needs ultralytics; groundplane stands in, so this checks the table's wiring, not ByteTrack
+    params = []
+    monkeypatch.setattr(phantoms, "create", lambda name, **p: params.append((name, p)) or create("groundplane"))
+    queue = read_detections(FX / "queue.dets.jsonl")
     poly = [tuple(p) for p in json.loads((FX / "zone.json").read_text())["polygon"]]
     truth = json.loads((FX / "queue.truth.json").read_text())["enters_ms"]
-    rows, tracks = phantoms.table(dets, poly, truth, queue=(dets, poly, truth))
+    dash = [Detection(f, f * 100, (590, 480, 614, 496), 0.35, "car") for f in range(60)]  # static, in the zone, off the lane
+    dets = sorted(queue + dash, key=lambda d: d.frame)
+    rows, tracks = phantoms.table(dets, poly, truth, queue=(dets, poly, truth))  # the dash goes to both counters
     assert [r["step"] for r in rows] == [s[1] for s in phantoms.STEPS]
     assert set(tracks) == {s[0] for s in phantoms.STEPS}
-    base = rows[0]
-    assert (base["matched"], base["false_visits"], base["queue_matched"]) == (6, 0, 6)  # groundplane counts all six
-    assert base["static"] == 0 and base["moving"] == base["enters"]  # the queue's cars all drive in
-    assert all(r["queue_matched"] == "n/a" for r, s in zip(rows, phantoms.STEPS) if s[2])  # ByteTrack-only settings
+    by = {s[0]: r for s, r in zip(phantoms.STEPS, rows)}
+    assert (by["baseline"]["matched"], by["baseline"]["false_visits"], by["baseline"]["static"]) == (6, 1, 1)
+    assert by["travel30"]["static"] == by["area1024"]["static"] == 0  # the zone rule and the size floor reach the dash
+    assert by["travel30"]["enters"] == by["baseline"]["enters"] - 1
+    assert [(r["queue_matched"], r["queue_false"]) for r in rows] == [  # the dash is the queue's one false visit
+        (6, 1), (6, 0), (6, 1), ("n/a", "n/a"), ("n/a", "n/a"), (6, 0), (3, 2), (1, 1)]  # masks drop stopped cars
+    assert {"new_track_thresh": 0.4} in [p for n, p in params] and {"new_track_thresh": 0.5} in [p for n, p in params]
