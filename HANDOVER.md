@@ -38,9 +38,11 @@ The repo's story is four field failures, each written up as its own case study u
 ### C. A fix for boxes straddling two side-by-side vehicles
 - Found on a dense expressway clip (`media/vecteezy-6434705.mp4`, metrics only): 2 of 52 zone enters sit on a box across
   two vehicles, by three visual passes. The zone rule keeps both; a birth score of 0.5 removes one and 9 other enters
-  whose truth is unknown. `replay.between` flags candidates but misses a straddling box that outscores its neighbours.
+  whose truth is unknown. `replay.between` flags candidates but misses track 451: in 130 of its 158 frames fewer than two
+  other boxes cover a fifth of it without matching it, so there is no pair to bridge.
 - Needs a dense clip with visit labels (`tools/label.html`) before any fix can be scored. Candidate: drop a box mostly
-  covered by two higher-scoring boxes, and check it keeps a car seen in the gap between two nearer ones.
+  covered by two higher-scoring boxes, and check it keeps a car seen in the gap between two nearer ones; track 451 shows
+  a straddle with fewer than two boxes around it, which that rule would not catch.
 
 ### Deferred
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.

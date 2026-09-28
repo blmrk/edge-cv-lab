@@ -140,8 +140,10 @@ counts as a straddle when at least two passes say so.
 - 2 of the 52 enters sit on a box straddling two vehicles side by side: tracks 1033 (all three passes: the upper half of
   a box truck and the car beside it) and 451 (two passes: a hatchback and half of the SUV next to it, both of which
   are counted on their own tracks too). 49 are a single vehicle in all three passes; one splits three ways.
-- The finder flags 28 of track 1033's 90 boxes and none of track 451's 158: a straddling box that outscores its
-  neighbours (track 451's mean score is 0.541) fails the finder's "weaker than both" test.
+- The finder flags 28 of track 1033's 90 boxes and none of track 451's 158, and none of 451's even with its score test
+  off (1033 would then get 75). Track 451 seldom has two separate boxes around it to bridge: in 130 of its 158
+  frames fewer than two other boxes cover a fifth of it without matching it, often because it overlaps the hatchback's
+  own box at IoU 0.5 or more (67 frames); in the other 28 the boxes around it are not side by side.
 
 Straddling boxes are common in the detections and rare in the counts: most score low and flicker, so ByteTrack does not
 start a track on them (birth score 0.25) or the debounced counter never commits them (5 frames inside, 1 s dwell). The
@@ -249,5 +251,24 @@ for name, px in (('runs/gap.bytetrack.jsonl', 0), ('runs/gap.bytetrack.jsonl', 3
         on = Counter(b.track_id for b in tr if b.frame in box and iou(b.bbox, box[b.frame]) >= 0.5)
         out[ref] = [(t, n) for t, n in on.items() if t in entered and n >= 0.25 * len(box)]
     print(name, 'min_travel', px, 'enters', len(entered), 'counted tracks on the straddles (id, frames):', out)"
-python -c "from replay.schema import read_tracks; t = [b for b in read_tracks('runs/gap.bytetrack.jsonl') if b.track_id == 451]; print(len(t), round(sum(b.score for b in t) / len(t), 3))"
+# why the finder misses track 451: its boxes with the score test on and off, and what surrounds them
+python -c "
+from collections import Counter, defaultdict; from dataclasses import replace
+from replay.between import bridge, _inter, _area; from replay.detections import read_detections
+from replay.schema import read_tracks; from replay.trackers.greedy_iou import iou
+by = defaultdict(list)
+for d in read_detections('runs/gap.dets.jsonl'): by[d.frame].append(d)
+tracks = list(read_tracks('runs/gap.bytetrack.jsonl'))
+for tid in (451, 1033):
+    c = Counter()
+    for t in (t for t in tracks if t.track_id == tid):
+        src = max(by[t.frame], key=lambda d: iou(d.bbox, t.bbox))
+        near = [d for d in by[t.frame] if d is not src and _inter(src.bbox, d.bbox) >= 0.2 * _area(src.bbox)]
+        c['boxes'] += 1
+        c['flagged'] += bridge(src, by[t.frame]) is not None
+        c['flagged, score test off'] += bridge(replace(src, score=-1.0), by[t.frame]) is not None
+        c['on one vehicle (IoU >= 0.5 with another box)'] += any(iou(src.bbox, d.bbox) >= 0.5 for d in near)
+        k = sum(iou(src.bbox, d.bbox) < 0.5 for d in near)
+        c['fewer than two other boxes cover a fifth of it' if k < 2 else 'two or more do, but no side-by-side pair'] += bridge(replace(src, score=-1.0), by[t.frame]) is None
+    print(tid, dict(c))"
 ```
