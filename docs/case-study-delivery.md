@@ -103,6 +103,7 @@ commits 4acd1c7 (both uplink drills and the broker restart without durable sessi
 with them); the services and compose file are the same at both.
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 make down && SIM_QOS=0 make up && make drill                        # before: zone events at QoS 0
 make down && make up && make drill                                  # after
 make down && DURABLE_SESSIONS=false make up && make broker-restart  # before: no durable sessions

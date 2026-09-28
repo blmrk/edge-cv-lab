@@ -79,6 +79,7 @@ make test
 **Full lab, no footage needed:**
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 make up              # synthetic traffic -> throttled uplink -> MQTT -> Postgres -> Grafana
 make counts          # enter/exit totals per counter
 ```
@@ -88,6 +89,7 @@ Grafana: http://localhost:3000 (no login; admin / lab to edit; `GRAFANA_PORT=300
 **Full lab with real video:**
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 # put a fixed-camera traffic clip at media/sample.mp4 (see media/README.md)
 make up-video        # RTSP loop -> YOLO + ByteTrack on CPU -> same pipeline
 ```
@@ -95,6 +97,7 @@ make up-video        # RTSP loop -> YOLO + ByteTrack on CPU -> same pipeline
 **Your own clip, end to end:**
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 open tools/label.html          # any browser: draw the zone, tap E/X while watching at 2x, save zone.json + truth.json
 pip install -e "harness[video]"
 cd harness
@@ -107,6 +110,7 @@ python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth tr
 **Break the network:**
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 chaos/scenarios.sh 64k        # 64 kbps uplink
 chaos/scenarios.sh outage 120 # 2 minute disconnect
 chaos/scenarios.sh reset

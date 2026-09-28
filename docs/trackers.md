@@ -55,6 +55,7 @@ of a video run. It needs ultralytics, so run it in the edge image; its fidelity 
 **Any research repo, no adapter code.** Most tracking papers read and write MOTChallenge text files:
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 cd harness
 python -m replay.motformat export-dets --dets runs/dets.jsonl --out seq/det/det.txt
 #   ... run the authors' code on seq/ following their README ...

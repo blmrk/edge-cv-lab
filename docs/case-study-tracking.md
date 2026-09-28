@@ -196,6 +196,7 @@ then the same with `--tracks fixtures/shadow_expansion.jsonl --expected 0`.
 ## Reproduce
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 pip install -e "harness[dev,trackeval]"   # scoring; detection runs in the edge image that `make up-video` builds
 docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge \
   python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --per-class-nms --out runs/dets.jsonl

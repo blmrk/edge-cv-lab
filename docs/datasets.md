@@ -18,6 +18,7 @@ logged in `media/SOURCES.md`.
 Keep the download under `media/UA-DETRAC/`, which is gitignored, never under `harness/`.
 
 ```bash
+setopt interactive_comments 2>/dev/null || true
 cd harness
 # 1. ground truth from the XML annotations (drops boxes inside the sequence's ignored regions)
 python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011
