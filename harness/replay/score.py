@@ -6,6 +6,7 @@ So each predicted enter is matched one-to-one to a labelled enter within a time 
 python -m replay.score --tracks runs/bytetrack.jsonl --zone zone.json --truth truth.json [--tolerance-ms 2000]
 python -m replay.score ... --explain   one row per debounced enter with how far its track moved, then the moving
                                       enters scored against the labels on their own
+python -m replay.score ... --min-travel-px 30   the debounced counter with its min_travel_px zone rule on
 """
 from __future__ import annotations
 
@@ -73,13 +74,15 @@ def main() -> None:
                     help="labelling reaction time + debounce delay; 2 s is generous but safe for sparse traffic")
     ap.add_argument("--explain", action="store_true", help="table of the debounced counter's enters, least travel first")
     ap.add_argument("--static-px", type=float, default=30, help="--explain: a track that moved less than this is static")
+    ap.add_argument("--min-travel-px", type=float, default=0,
+                    help="debounced counter: an enter waits until the track has moved this far (0: off, the default)")
     a = ap.parse_args()
 
     poly = [tuple(p) for p in json.load(open(a.zone))["polygon"]]
     truth = json.load(open(a.truth))["enters_ms"]
     boxes = sorted(read_tracks(a.tracks), key=lambda b: (b.frame, b.track_id))
     if a.explain:
-        rows, s = explain(boxes, poly, truth, a.tolerance_ms, a.static_px)
+        rows, s = explain(boxes, poly, truth, a.tolerance_ms, a.static_px, min_travel_px=a.min_travel_px)
         cols = ["ts_ms", "track_id", "travel_px", "w", "h", "score", "boxes"]
         print("| " + " | ".join(c.replace("_", " ") for c in cols) + " |")
         print("|" + "---|" * len(cols))
@@ -92,7 +95,7 @@ def main() -> None:
         return
     out = {}
     for name, counter in {"naive_centroid": NaiveZoneCounter(poly, "centroid"),
-                          "debounced_footpoint": DebouncedZoneCounter(poly)}.items():
+                          "debounced_footpoint": DebouncedZoneCounter(poly, min_travel_px=a.min_travel_px)}.items():
         enters = [e.ts_ms for e in run(counter, boxes) if e.kind == "enter"]
         out[name] = match(enters, truth, a.tolerance_ms)
     print(json.dumps(out, indent=2))
