@@ -146,3 +146,34 @@ def test_explain_passes_counter_settings_through():
     boxes = sorted(car + dash, key=lambda b: (b.frame, b.track_id))
     rows, _ = explain(boxes, square, truth_ms=[1100], min_travel_px=30)
     assert [r["track_id"] for r in rows] == [1]  # the dash never moved, so it never entered
+
+
+def _returned_by(counter, boxes):
+    """(frame of the box whose update() returned it, kind) per event; flush() at the last frame."""
+    out = [(b.frame, e.kind) for b in boxes for e in counter.update(b)]
+    return out + [(boxes[-1].frame, e.kind) for e in counter.flush()]
+
+
+def _drive_through(stop_frames):
+    xs = list(range(300, 600, 10)) + [600] * stop_frames + list(range(600, 900, 10))  # in, stop, out, 30 fps
+    return [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400), 0.9, "car") for f, x in enumerate(xs)]
+
+
+def test_debounced_holds_each_enter_until_its_visit_closes_by_default():
+    # a live consumer of the events learns about the visit only when it is over
+    assert _returned_by(DebouncedZoneCounter(POLY), _drive_through(90)) == [(148, "enter"), (148, "exit")]
+
+
+def test_enter_after_dwell_releases_the_enter_once_the_visit_has_lasted_min_dwell():
+    car = _drive_through(90)
+    got = _returned_by(DebouncedZoneCounter(POLY, enter_after_dwell=True), car)
+    entered = run(DebouncedZoneCounter(POLY), car)[0]
+    assert got == [(entered.frame + 30, "enter"), (148, "exit")]  # 30 frames = 1 s at 30 fps
+    assert sorted(run(DebouncedZoneCounter(POLY, enter_after_dwell=True), car), key=lambda e: e.ts_ms) == \
+        sorted(run(DebouncedZoneCounter(POLY), car), key=lambda e: e.ts_ms)  # same events, same stamps
+
+
+def test_enter_after_dwell_still_drops_a_visit_shorter_than_min_dwell():
+    # crosses the zone at 30 px a frame: inside for about half a second, then fully out
+    quick = [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400)) for f, x in enumerate(range(380, 1200, 30))]
+    assert run(DebouncedZoneCounter(POLY), quick) == run(DebouncedZoneCounter(POLY, enter_after_dwell=True), quick) == []

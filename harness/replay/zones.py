@@ -68,7 +68,11 @@ class DebouncedZoneCounter:
       Trade-off: a vehicle that stops closer than margin_px to an edge never flips state (a stop just
       inside is not counted, a wait just outside keeps the visit open), and a zone must be at least
       2 * margin_px wide to count anything. Keep stopping areas clear of the zone's edges.
-    - min_dwell_ms: a visit shorter than this is discarded entirely (enter and exit both dropped).
+    - min_dwell_ms: a visit shorter than this is discarded entirely (enter and exit both dropped). To make that
+      possible the enter is held back: by default until the visit closes, so it is returned together with its exit
+      (stamped with the time the vehicle entered) and a live consumer never sees a vehicle that is still inside.
+    - enter_after_dwell: return the held enter as soon as the visit has lasted min_dwell_ms instead, so live
+      enters minus exits tracks occupancy. Same events and timestamps either way; only when they are returned changes.
     - cooldown_ms: after an exit, the same track cannot re-enter for this long.
     - lost_ms: a track that vanishes while inside (tracker dropped it, ID changed, object occluded)
       is closed after this long, stamped with the time it was last seen. Without this, a lost
@@ -93,10 +97,12 @@ class DebouncedZoneCounter:
         lost_ms: int = 3000,
         margin_px: float = 10,
         min_travel_px: float = 0,
+        enter_after_dwell: bool = False,
     ):
         self.polygon, self.anchor, self.margin_px, self.min_travel_px = polygon, anchor, margin_px, min_travel_px
         self.enter_frames, self.exit_frames = enter_frames, exit_frames
         self.min_dwell_ms, self.cooldown_ms, self.lost_ms = min_dwell_ms, cooldown_ms, lost_ms
+        self.enter_after_dwell = enter_after_dwell
         self._s: dict[int, _State] = {}
 
     def _close(self, tid: int, s: _State, ts_ms: int, frame: int) -> list[ZoneEvent]:
@@ -118,7 +124,11 @@ class DebouncedZoneCounter:
 
     def update(self, box: TrackBox) -> list[ZoneEvent]:
         expired = self.expire(box.ts_ms)
-        return expired + self._update(box)
+        s = self._s.get(box.track_id)
+        released = []
+        if self.enter_after_dwell and s and s.pending and box.ts_ms - s.entered_ts >= self.min_dwell_ms:
+            released, s.pending = [s.pending], None
+        return expired + released + self._update(box)
 
     def _update(self, box: TrackBox) -> list[ZoneEvent]:
         s = self._s.setdefault(box.track_id, _State())
@@ -141,7 +151,7 @@ class DebouncedZoneCounter:
             if not s.moved:
                 return []  # has not moved yet; keep streak so it commits once it has
             s.inside, s.streak, s.entered_ts = True, 0, box.ts_ms
-            # Hold the enter event until dwell is proven, so short visits emit nothing.
+            # Hold the enter back (see min_dwell_ms and enter_after_dwell), so short visits emit nothing.
             s.pending = ZoneEvent("enter", box.track_id, box.ts_ms, box.frame)
             return []
 
