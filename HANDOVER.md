@@ -6,7 +6,7 @@ Last updated 2026-09-28. Everything below has been run unless marked otherwise.
 
 | Piece | State |
 |---|---|
-| Replay harness, 108 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 112 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
