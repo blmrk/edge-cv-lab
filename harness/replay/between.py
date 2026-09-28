@@ -109,6 +109,7 @@ def main() -> None:
     ap.add_argument("--zone", required=True)
     ap.add_argument("--sheet", help="write contact sheets of every enter here (needs --video and opencv)")
     ap.add_argument("--video")
+    ap.add_argument("--min-travel-px", type=float, default=0, help="the debounced counter's zone rule (0: off)")
     a = ap.parse_args()
     if a.sheet and not a.video:
         ap.error("--sheet needs --video")
@@ -121,7 +122,7 @@ def main() -> None:
     frames = len({f for f, ds in by_frame.items() if any(bridge(d, ds) for d in ds)})
     print(f"detections {len(dets)} in {len(by_frame)} frames | bridge boxes {len(flagged)} in {frames} frames"
           + (f", median score {flagged[len(flagged) // 2]}" if flagged else ""))
-    rows = enters_table(dets, tracks, poly)
+    rows = enters_table(dets, tracks, poly, min_travel_px=a.min_travel_px)
     print(f"enters {len(rows)} | with any bridge box {sum(r['bridge_boxes'] > 0 for r in rows)} | "
           f"half or more {sum(r['bridge_share'] >= 0.5 for r in rows)}\n")
     cols = ["enter", "ts_ms", "track_id", "boxes", "bridge_boxes", "bridge_share", "score"]
