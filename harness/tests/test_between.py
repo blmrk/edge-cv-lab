@@ -1,3 +1,5 @@
+import pytest
+
 from replay import between
 from replay.detections import Detection
 from replay.schema import TrackBox
@@ -15,13 +17,16 @@ def test_a_weaker_box_across_two_side_by_side_vehicles_is_a_bridge_box():
     assert [d.bbox for d in dets if between.bridge(d, dets)] == [STRADDLE]  # and neither car is one
 
 
-def test_a_box_on_one_vehicle_or_between_vehicles_one_behind_the_other_is_not():
-    on_left = (105, 302, 205, 382)                         # IoU 0.86 with LEFT: a second box on the same car
-    dets = _frame((LEFT, 0.9), (RIGHT, 0.8), (on_left, 0.2))
-    assert not between.bridge(dets[2], dets)
-    behind = (100, 200, 200, 280)                          # same x as LEFT, a row further back: not side by side
-    dets = _frame((LEFT, 0.9), (behind, 0.8), ((100, 250, 200, 330), 0.2))
-    assert not any(between.bridge(d, dets) for d in dets)
+@pytest.mark.parametrize("why, near, weak", [  # each box fails exactly one of bridge()'s geometry rules
+    ("touch: between them in x, but a lane further on, touching neither", [LEFT, RIGHT], (160, 500, 260, 580)),
+    ("match: IoU 0.71 with LEFT, so it is a second box on LEFT", [LEFT, RIGHT], (100, 300, 240, 380)),
+    ("rows: the two sit one behind the other, not side by side", [LEFT, (160, 200, 260, 280)], (130, 240, 230, 340)),
+    ("pair: the two overlap each other at IoU 0.18", [LEFT, (170, 300, 270, 380)], (150, 310, 230, 370)),
+    ("centre: it covers both and reaches far past them", [LEFT, RIGHT], (100, 300, 500, 380)),
+])
+def test_each_geometry_rule_on_its_own_rejects_a_box(why, near, weak):
+    dets = _frame((near[0], 0.9), (near[1], 0.8), (weak, 0.2))
+    assert not between.bridge(dets[2], dets), why
 
 
 def test_a_bridge_box_must_score_below_both_vehicles():
