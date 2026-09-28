@@ -145,9 +145,10 @@ counts as a straddle when at least two passes say so.
   frames fewer than two other boxes cover a fifth of it without matching it, often because it overlaps the hatchback's
   own box at IoU 0.5 or more (67 frames); in the other 28 the boxes around it are not side by side.
 
-Straddling boxes are common in the detections and rare in the counts: most score low and flicker, so ByteTrack does not
-start a track on them (birth score 0.25) or the debounced counter never commits them (5 frames inside, 1 s dwell). The
-two that do get counted are not stopped by the fixes above:
+Flagged boxes are common in the detections and rare in the counts: they score low (median 0.158), so ByteTrack does not
+start a track on most of them (birth score 0.25), and the debounced counter needs 5 frames inside and 1 s of dwell. Of
+the two straddles that do get counted, the zone rule and a birth score of 0.4 stop neither; a birth score of 0.5 stops
+one:
 
 | run | enters | track 451's straddle counted | track 1033's straddle counted |
 |---|---|---|---|
@@ -156,7 +157,8 @@ two that do get counted are not stopped by the fixes above:
 | track birth score 0.4 | 48 | yes | yes |
 | track birth score 0.5 | 42 | yes | no |
 
-"Counted" means a counted track follows the straddling box (IoU 0.5) for at least a quarter of its frames. The zone
+"Counted" means a counted track follows the straddling box (IoU 0.5) for at least a quarter of its frames and spends at
+least half of its own boxes on it, so the track of a vehicle under the straddle does not qualify. The zone
 rule cannot see them, since they move with traffic; the size floor and the static mask are built for small or static
 boxes, and these are neither. The birth score 0.5 removes the weaker one and 9 other enters, which may be missed
 vehicles or double counts: with no visit labels, this clip cannot say. A fix for this kind (for example, dropping a box
@@ -245,12 +247,13 @@ base = list(read_tracks('runs/gap.bytetrack.jsonl'))
 for name, px in (('runs/gap.bytetrack.jsonl', 0), ('runs/gap.bytetrack.jsonl', 30), ('runs/gap.bytetrack.birth0.4.jsonl', 0), ('runs/gap.bytetrack.birth0.5.jsonl', 0)):
     tr = sorted(read_tracks(name), key=lambda b: (b.frame, b.track_id))
     entered = {e.track_id for e in run(DebouncedZoneCounter(poly, min_travel_px=px), tr) if e.kind == 'enter'}
+    size = Counter(b.track_id for b in tr)
     out = {}
     for ref in (451, 1033):
         box = {b.frame: b.bbox for b in base if b.track_id == ref}
         on = Counter(b.track_id for b in tr if b.frame in box and iou(b.bbox, box[b.frame]) >= 0.5)
-        out[ref] = [(t, n) for t, n in on.items() if t in entered and n >= 0.25 * len(box)]
-    print(name, 'min_travel', px, 'enters', len(entered), 'counted tracks on the straddles (id, frames):', out)"
+        out[ref] = [(t, n, size[t]) for t, n in on.items() if t in entered and n >= 0.25 * len(box) and n >= 0.5 * size[t]]
+    print(name, 'min_travel', px, 'enters', len(entered), 'counted tracks on each straddle (id, frames on it, frames):', out)"
 # why the finder misses track 451: its boxes with the score test on and off, and what surrounds them
 python -c "
 from collections import Counter, defaultdict; from dataclasses import replace
