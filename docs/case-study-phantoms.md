@@ -67,7 +67,7 @@ tracker does not have (the queue's boxes score 0.6 to 0.95, above every threshol
 | static-box mask, boxes in 25% of frames | 30 | 9 | 21 | 14 | 16 | 0 | 0.636 | 0.8 | 3 | 1 |
 | static-box mask, boxes in 10% of frames | 22 | 1 | 21 | 14 | 8 | 0 | 0.778 | 0.8 | 1 | 0 |
 
-No fix loses a labelled visit or touches the 21 moving enters: every enter a fix removes is a static one. The same tracks
+No fix loses a labelled visit: every row keeps the 21 moving enters and 14 matches, and only the static count falls. The same tracks
 scored by TrackEval against the annotated tracks (`scripts/trackeval_run.py`, as in the counting study):
 
 | step | HOTA | DetA | AssA | IDF1 | MOTA | IDSW |
