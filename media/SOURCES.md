@@ -6,6 +6,7 @@ number and image in the repo can be traced to a source and a licence. One row pe
 | File | Source and URL | Author | Licence | Downloaded | Used for | Shown publicly? |
 |---|---|---|---|---|---|---|
 | `sample.mp4` | MTID (Multi-View Traffic Intersection Dataset), infrastructure camera, frames `seq3-infra_0000001` to `0003199`: https://vap.aau.dk/mtid/ (downloaded from Kaggle `andreasmoegelmose/multiview-traffic-intersection-dataset`, the authors' official copy) | M. B. Jensen, A. Møgelmose, T. B. Moeslund (Aalborg University) | CC BY 4.0 | 2026-09-26 | lab demo (video profile), zone metrics | yes, with credit and citation |
+| `vecteezy-6434705.mp4` | Vecteezy 6434705, "Busy traffic on the highway": https://www.vecteezy.com/video/6434705-busy-traffic-on-the-highway (downloaded from Kaggle `aniketdash7/sample-video`, file `vecteezy_busy-traffic-on-the-highway_6434705.mp4`, 78563821 bytes; the Apache 2.0 label on Kaggle is the uploader's, not the author's) | Bondeto ae (Vecteezy contributor) | Vecteezy Free License, attribution required | 2026-09-28 | phantom boxes case study: boxes between side-by-side vehicles | no, metrics and credit only |
 | `pexels-5124507.mp4` (was `sample.mp4`; deleted) | Pexels 5124507, https://www.pexels.com/video/5124507/ (fetched from Kaggle `arunavfc11/indian-traffic-videos`, file `5124507-hd_1920_1080_30fps.mp4`, same byte size as on Pexels' file server) | TBD: confirm on the Pexels page (it blocks automated access) | Pexels License | 2026-09-25 | replaced: video-profile plumbing test only; handheld, so no zone metrics | no |
 | `mot17-04.mp4` | MOTChallenge, https://motchallenge.net/data/MOT17 | Milan et al. | CC BY-NC-SA 3.0 | YYYY-MM-DD | tracker metrics only | no, metrics and citation only |
 
@@ -29,6 +30,10 @@ who labelled the ground truth and how (`tools/label.html`, playback speed, singl
   (2017-11-09). 1024x640 at 30 fps, 3199 frames (106.63 s): the range covered by the dataset's infrastructure
   annotations, which are kept locally under `media/candidates/mtid/annotations/`. Built from the frames with
   `ffmpeg -framerate 30 -start_number 1 -i seq3-infra_%07d.jpg -frames:v 3199 -c:v libx264 -pix_fmt yuv420p -crf 20 -movflags +faststart sample.mp4`.
+
+- `vecteezy-6434705.mp4`: stock footage, not a mounted traffic camera: fixed, elevated telephoto view (overpass
+  height) looking obliquely down a divided multi-lane expressway, daytime, cars two and three abreast with motorcycles
+  between them. 1920x1080 at 50 fps, 1500 frames, 30.0 s (`ffprobe`). No annotations.
 
 ## Citations
 
