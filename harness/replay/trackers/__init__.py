@@ -9,7 +9,7 @@ boxes it wants to report for THAT frame with stable track_ids. Register with @re
 
 Three ways to plug a tracker in:
   1. Write it here in pure Python (see greedy_iou.py, groundplane.py).
-  2. Wrap a Python package (see boxmot_adapter.py).
+  2. Wrap a Python package (see boxmot_adapter.py, bytetrack.py).
   3. Run any research repo on its own and exchange MOTChallenge text files (see replay/motformat.py).
      This needs no adapter code at all and is the right route for FastTracker, UCMCTrack, TrackTrack.
 """
@@ -55,4 +55,4 @@ def run_tracker(tracker: Tracker, dets: list[Detection]) -> list[TrackBox]:
 
 
 def _load():
-    from . import boxmot_adapter, greedy_iou, groundplane  # noqa: F401  (import = register)
+    from . import boxmot_adapter, bytetrack, greedy_iou, groundplane  # noqa: F401  (import = register)
