@@ -96,7 +96,8 @@ BYTETRACK_YAML = {"tracker_type": "bytetrack", "track_high_thresh": 0.25, "track
 
 def _fake_ultralytics(monkeypatch):
     """ultralytics stubbed at the import boundary. The fake BYTETracker records its args and every array it is fed,
-    and reports one track per detection with id 7 and the box shifted 1 px right, so its output is told apart."""
+    and reports one track per detection, id 7 + its index, box shifted 1 px right, in reverse order: like the real
+    one, its rows do not come back in detection order, so only the index column ties a row to its detection."""
     seen = {"arrays": []}
 
     class BYTETracker:
@@ -105,7 +106,8 @@ def _fake_ultralytics(monkeypatch):
 
         def update(self, boxes):
             seen["arrays"].append(boxes.data)
-            return [[r[0] + 1, r[1], r[2] + 1, r[3], 7, r[4], r[5], i] for i, r in enumerate(boxes.data.tolist())]
+            rows = [[r[0] + 1, r[1], r[2] + 1, r[3], 7 + i, r[4], r[5], i] for i, r in enumerate(boxes.data.tolist())]
+            return rows[::-1]
 
     for name, attrs in {
         "ultralytics": {},
@@ -136,5 +138,6 @@ def test_bytetrack_is_fed_every_frame_and_reports_its_own_boxes(monkeypatch):
     out = run_tracker(create("bytetrack"), dets)
     assert [a.shape for a in seen["arrays"]] == [(2, 6), (0, 6), (1, 6)]  # x1 y1 x2 y2 score class
     assert seen["arrays"][0][1].tolist() == pytest.approx([100, 20, 150, 60, 0.3, 0])
-    b = out[1]
-    assert (b.frame, b.track_id, b.bbox, round(b.score, 3), b.cls) == (0, 7, (101, 20, 151, 60), 0.3, "truck")
+    got = [(b.frame, b.track_id, b.bbox, round(b.score, 3), b.cls) for b in out]
+    assert got == [(0, 8, (101, 20, 151, 60), 0.3, "truck"), (0, 7, (11, 20, 51, 60), 0.9, "car"),
+                   (2, 7, (13, 20, 53, 60), 0.8, "car")]  # class from the detection the index names, not row order
