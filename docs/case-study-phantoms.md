@@ -34,8 +34,8 @@ side by side and travels with them. The last section looks for it and asks wheth
 
 ByteTrack defaults on the class-agnostic detections, debounced counter: 39 enters against 14 labelled visits, 14
 matched, 25 false, none missed, F1 0.528. `replay.score --explain` splits the enters in two groups with nothing
-between: 18 tracks whose footpoint moved at most 6.0 px, with boxes on average 22.3 to 33.7 px wide and 13.8 to 23.9
-px tall at mean scores 0.166 to 0.314, and 21 that moved at least 357.2 px. The 21 moving enters alone match all 14
+between: 18 tracks whose footpoint moved at most 5.8 px, with boxes on average 22.2 to 33.7 px wide and 13.8 to 24.0
+px tall at mean scores 0.166 to 0.314, and 21 that moved at least 375.6 px. The 21 moving enters alone match all 14
 visits with 7 false (F1 0.8). Drawn on a frame, the static group sits on the white dashes of the bike lane that crosses
 the zone.
 
@@ -94,7 +94,7 @@ the default, 0, which leaves the rule off.
 **Boxes under 32 x 32 px dropped**, before tracking. 32 x 32 is the small-object bound of the COCO detection
 benchmark, not tuned here. It also removes all 18, keeps the queue, and raises every TrackEval score (HOTA 0.225 to
 0.232, MOTA -0.078 to 0.009). It depends on the view: the smallest moving
-enter here averaged 71.3 x 67.1 px, but a camera further from the road sees real vehicles smaller than 32 x 32, and no
+enter here averaged 72.0 x 67.1 px, but a camera further from the road sees real vehicles smaller than 32 x 32, and no
 size filter can remove a large static box such as the bins at the crossing.
 
 **Track birth score** 0.4 and 0.5 (`new_track_thresh`, default 0.25) leave 5 and 1 phantom enters. The tracks change
