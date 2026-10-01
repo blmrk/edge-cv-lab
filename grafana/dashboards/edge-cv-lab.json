@@ -149,7 +149,8 @@
           "color": {
             "mode": "fixed",
             "fixedColor": "orange"
-          }
+          },
+          "decimals": 1
         },
         "overrides": []
       },
