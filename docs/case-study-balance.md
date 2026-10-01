@@ -39,10 +39,10 @@ truth, and asks what a live consumer of the events can know.
 ## Baseline
 
 The naive counter (centroid, one event per crossing) on ByteTrack's tracks: 62 enters, 12 exits, a balance of 50. 46 of
-its open visits are tracks whose last box sat inside the zone more than 3 s before the clip ended: a track that ends
-inside the zone is a vehicle the tracker lost or gave a new ID, and the naive counter has no rule that closes a visit
-whose track goes silent. Its
-occupancy only climbs: at the last annotated frame it says 46 vehicles are inside, where the annotations have none, and
+its open visits are tracks whose last box sat inside the zone more than 3 s before the clip ended, and the naive counter
+has no rule that closes a visit whose track goes silent. 36 of the 46 never moved 30 px: the phantom study's static
+lane-marking tracks, dropped by the tracker. The other 10 are moving vehicles the tracker lost or gave a new ID inside the
+zone. Its occupancy only climbs: at the last annotated frame it says 46 vehicles are inside, where the annotations have none, and
 its mean error is 22.074.
 
 ## Fixes, one at a time
@@ -86,16 +86,20 @@ And the expressway band, no annotations, so balance and open visits only:
 | debounced + zone rule 30 px + enter after dwell | 47 | 40 | 7 | 7 | 0 | 0 |
 
 **Closing lost tracks does most of the work.** Hysteresis and the dwell rule without the lost-track close still leave a
-balance of 54 on ByteTrack (42 visits lost inside, 10 whose track ended outside the zone before the exit committed).
+balance of 54 on ByteTrack: 42 visits lost inside (34 of them static tracks), 10 whose track ended outside the zone
+before the exit committed, and 2 still inside at the end.
 Closing a visit 3 s after its track was last seen (`lost_ms`) takes it to 3, and to 1 on `greedy_iou:max_age=5`. On the
-expressway band it takes 54 to 9, and every one of the 9 is a track seen inside within 3 s of the end, which is what
-vehicles still in the band look like; without annotations this clip cannot confirm them.
+expressway band it takes 54 to 9. Those 9 were all seen inside within 3 s of the end, but only 4 in the last frame; the
+other 5 were last seen 1.18 to 2.6 s before it and are open only because `lost_ms` has not run out. The zone rule leaves
+7. Without annotations this clip cannot say which are vehicles still in the band.
 
-**What is left is phantoms.** ByteTrack's 3 open visits are tracks 779 and 808, two of the phantom study's static
-lane-marking tracks, still "inside" when the clip ends, and track 769, a vehicle leaving in the last frames whose exit
-had not committed yet. After the fact, the debounced counter's occupancy is further from the truth than saying "empty"
-(0.486 against 0.384): each phantom is a visit the counter holds open while nothing is there. The zone rule removes them:
-balance 1, error 0.118.
+**What is left: phantoms, and a vehicle leaving.** ByteTrack's 3 open visits at the end of the clip are tracks 779 and
+808, two of the phantom study's static lane-marking tracks, and track 769, a vehicle leaving in the last frames whose
+exit had not committed yet. All three enter after frame 3098, the last annotated one, so they do not touch the occupancy
+scores. Inside the annotated frames the debounced counter commits 16 other static tracks, each a visit held open while
+nothing is there: after the fact its occupancy is 1415 vehicle-frames above the truth and 91 below, further from the
+truth than saying "empty" (0.486 against 0.384). The zone rule removes the static enters: 146 above and 220 below, error
+0.118, and a balance of 1 at the end, track 769.
 
 **Live, the events carry no occupancy.** The debounced counter holds each enter back until its visit closes and then
 returns it together with its exit, stamped with the time the vehicle entered (a test in `harness/tests/test_zones.py`
@@ -123,7 +127,8 @@ it was after every visit and never shows a vehicle that is still inside.
 Not changed in this study (the services keep every default). From the measurements above:
 
 - Publish occupancy as a gauge from the counter's state (`open_visits(now, seen_within_ms=500)`) with the zone rule on,
-  instead of deriving it from events; label the event sum as what it is, a count of closed visits.
+  instead of deriving it from events. With the default counter the panel's running enters minus exits is back where it
+  was after every visit: it shows that each enter met its exit, not occupancy. Relabel it, or replace it with the gauge.
 - The edge calls `counter.update()` only for frames that have track boxes, so `expire()` runs only when some box
   arrives: a visit whose track is lost stays open until the next vehicle is detected. On these clips that never mattered
   (every ByteTrack frame has a box, and `greedy_iou:max_age=5` lacks one in 7 frames), but on a quiet camera it would.
@@ -131,7 +136,7 @@ Not changed in this study (the services keep every default). From the measuremen
 
 ## Limitations
 
-- One annotated clip, 3199 frames at 30 fps. True occupancy uses the annotated boxes' footpoint, the same anchor as the counters: a
+- One annotated clip: 3199 frames at 30 fps, 3099 of them annotated. True occupancy uses the annotated boxes' footpoint, the same anchor as the counters: a
   vehicle the annotations miss, or one whose footpoint sits on the wrong side of the zone edge on this oblique view (see
   the counting study's "What did not work"), counts as an error either way.
 - The live and gauge views are replayed offline from the saved tracks, not measured on the running lab or its dashboard.
@@ -146,10 +151,11 @@ setopt interactive_comments 2>/dev/null || true
 # runs/gap.bytetrack.jsonl and runs/gap.zone.json; the counting study's makes runs/mtid.gt.jsonl
 pip install -e "harness[dev]"
 ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames media/sample.mp4
+ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames media/vecteezy-6434705.mp4
 cd harness
 python -m replay.balance --tracks runs/bytetrack.agnostic.jsonl --zone zone.json --gt runs/mtid.gt.jsonl --explain
 python -m replay.balance --tracks runs/greedy_iou_5.agnostic.jsonl --zone zone.json --gt runs/mtid.gt.jsonl
-python -m replay.balance --tracks runs/gap.bytetrack.jsonl --zone runs/gap.zone.json
+python -m replay.balance --tracks runs/gap.bytetrack.jsonl --zone runs/gap.zone.json --explain
 # frames that have any track box, per run
 python -c "
 from replay.schema import read_tracks
@@ -170,6 +176,32 @@ for kw in (dict(min_travel_px=30), dict(min_travel_px=30, enter_after_dwell=True
     over = sum(max(0, occ[f] - truth.get(f, 0)) for f, _ in frame_ts); under = sum(max(0, truth.get(f, 0) - occ[f]) for f, _ in frame_ts)
     lag = [at - e.ts_ms for at, e in live if e.kind == 'exit']
     print(kw, '| live over', over, 'under', under, '| exits', len(lag), 'emitted 3 s or more after their stamp', sum(x >= 3000 for x in lag))"
+# frame ranges, greedy_iou's box-less frames, and which open visits and enters are static (moved under 30 px)
+python -c "
+import json, math
+from collections import defaultdict
+from replay import balance; from replay.schema import read_tracks; from replay.zones import DebouncedZoneCounter, NaiveZoneCounter
+poly = [tuple(p) for p in json.load(open('zone.json'))['polygon']]
+truth = balance.true_occupancy(read_tracks('runs/mtid.gt.jsonl'), poly); lo, hi = min(truth), max(truth)
+boxes = sorted(read_tracks('runs/bytetrack.agnostic.jsonl'), key=lambda b: (b.frame, b.track_id))
+by = defaultdict(list)
+for b in boxes: by[b.track_id].append(b.footpoint)
+travel = {t: math.hypot(max(x for x, _ in p) - min(x for x, _ in p), max(y for _, y in p) - min(y for _, y in p)) for t, p in by.items()}
+print('annotated frames', lo, 'to', hi, '| last track frame', boxes[-1].frame)
+g = {b.frame for b in read_tracks('runs/greedy_iou_5.agnostic.jsonl')}
+print('greedy_iou_5 frames with no box:', [(f, truth.get(f, 0)) for f in range(boxes[-1].frame + 1) if f not in g])
+for name, c, anchor in (('naive, centroid', NaiveZoneCounter(poly, 'centroid'), 'centroid'), ('debounced, no lost-track close', DebouncedZoneCounter(poly, lost_ms=10**12), 'footpoint')):
+    ev = [e for _, e in balance.emitted(c, boxes)]
+    lost = [r['track_id'] for r in balance.open_visits(ev, boxes, poly, anchor) if r['reason'] == 'lost inside']
+    print(name, '| lost inside', len(lost), '| static (moved < 30 px)', sum(travel[t] < 30 for t in lost))
+frame_ts = sorted({(b.frame, b.ts_ms) for b in boxes if lo <= b.frame <= hi})
+for name, kw in (('debounced', {}), ('debounced + zone rule 30 px', dict(min_travel_px=30))):
+    ev = [e for _, e in balance.emitted(DebouncedZoneCounter(poly, **kw), boxes)]
+    occ = balance.occupancy([(e.ts_ms, e) for e in ev], frame_ts)
+    over = sum(max(0, occ[f] - truth.get(f, 0)) for f, _ in frame_ts); under = sum(max(0, truth.get(f, 0) - occ[f]) for f, _ in frame_ts)
+    static_in = sorted(e.track_id for e in ev if e.kind == 'enter' and travel[e.track_id] < 30 and e.frame <= hi)
+    print(name, '| after the fact: over', over, 'under', under, '| static enters inside the annotated frames', len(static_in))
+    print('  enter frames of 769, 779, 808:', [(e.track_id, e.frame) for e in ev if e.kind == 'enter' and e.track_id in (769, 779, 808)])"
 # the phantom study's --explain lists tracks 779 and 808 among the static enters
 python -m replay.score --tracks runs/bytetrack.agnostic.jsonl --zone zone.json --truth truth.json --explain
 ```
