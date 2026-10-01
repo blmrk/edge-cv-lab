@@ -223,7 +223,7 @@
         "type": "postgres",
         "uid": "lab-pg"
       },
-      "description": "Same traffic, two counting strategies.",
+      "description": "Same traffic, two counting strategies, per minute: debounced (green) in the first half of each minute, naive (red) in the second.",
       "gridPos": {
         "x": 0,
         "y": 5,
@@ -240,7 +240,7 @@
           "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT $__timeGroupAlias(received_at,'1m',0), counter AS metric, count(*) AS visits FROM zone_events WHERE kind='enter' AND $__timeFilter(received_at) GROUP BY 1,2 ORDER BY 1"
+          "rawSql": "SELECT extract(epoch FROM m) + 30 AS time, c.counter AS metric, count(e.event_id) AS visits FROM generate_series(date_trunc('minute', $__timeFrom()::timestamptz), $__timeTo()::timestamptz, '1 minute') m CROSS JOIN (VALUES ('debounced'), ('naive')) c(counter) LEFT JOIN zone_events e ON e.kind='enter' AND e.counter=c.counter AND e.received_at >= m AND e.received_at < m + interval '1 minute' AND $__timeFilter(e.received_at) GROUP BY 1, 2 ORDER BY 1"
         }
       ],
       "fieldConfig": {
@@ -248,7 +248,8 @@
           "custom": {
             "drawStyle": "bars",
             "fillOpacity": 70,
-            "lineWidth": 0
+            "lineWidth": 0,
+            "barWidthFactor": 0.45
           }
         },
         "overrides": [
@@ -264,6 +265,10 @@
                   "mode": "fixed",
                   "fixedColor": "red"
                 }
+              },
+              {
+                "id": "custom.barAlignment",
+                "value": 1
               }
             ]
           },
@@ -279,6 +284,10 @@
                   "mode": "fixed",
                   "fixedColor": "green"
                 }
+              },
+              {
+                "id": "custom.barAlignment",
+                "value": -1
               }
             ]
           }
