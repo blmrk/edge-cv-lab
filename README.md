@@ -82,7 +82,7 @@ make test
 setopt interactive_comments 2>/dev/null || true
 make up              # synthetic traffic -> throttled uplink -> MQTT -> Postgres -> Grafana
 make counts          # enter/exit totals per counter
-# opt-in: OCCUPANCY_GAUGE_MS=500 make up adds a vehicles-in-zone gauge panel (off by default; docs/case-study-balance.md)
+# opt-in: OCCUPANCY_GAUGE_MS=500 make up fills the "Vehicles in zone (gauge, opt-in)" panel (empty by default; docs/case-study-balance.md)
 ```
 
 Grafana: http://localhost:3000 (no login; admin / lab to edit; `GRAFANA_PORT=3001 make up` if 3000 is taken). EMQX: http://localhost:18083 (admin / public).
