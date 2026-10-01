@@ -488,7 +488,7 @@
         "type": "postgres",
         "uid": "lab-pg"
       },
-      "description": "Committed visits whose track was seen in the last OCCUPANCY_GAUGE_MS, one sample a second per device. Empty unless a device runs with OCCUPANCY_GAUGE_MS set (off by default); the measured setting is 500, with MIN_TRAVEL_PX=30 on the edge (docs/case-study-balance.md).",
+      "description": "Committed visits whose track was seen in the last OCCUPANCY_GAUGE_MS, one sample a second per device, plotted at the device's sample time, not its arrival. Empty unless a device runs with OCCUPANCY_GAUGE_MS set (off by default); the measured setting is 500, with MIN_TRAVEL_PX=30 on the edge (docs/case-study-balance.md).",
       "gridPos": {
         "x": 0,
         "y": 30,
@@ -505,7 +505,7 @@
           "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT received_at AS time, device_id AS metric, in_zone FROM zone_occupancy WHERE counter='debounced' AND $__timeFilter(received_at) ORDER BY 1"
+          "rawSql": "SELECT to_timestamp(ts_ms / 1000.0) AS time, device_id AS metric, in_zone FROM zone_occupancy WHERE counter='debounced' AND $__timeFilter(received_at) ORDER BY 1"
         }
       ],
       "fieldConfig": {
@@ -513,7 +513,8 @@
           "custom": {
             "drawStyle": "line",
             "lineInterpolation": "stepAfter",
-            "fillOpacity": 15
+            "fillOpacity": 15,
+            "spanNulls": true
           }
         },
         "overrides": []
