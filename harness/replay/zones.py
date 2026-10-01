@@ -71,8 +71,10 @@ class DebouncedZoneCounter:
     - min_dwell_ms: a visit shorter than this is discarded entirely (enter and exit both dropped). To make that
       possible the enter is held back: by default until the visit closes, so it is returned together with its exit
       (stamped with the time the vehicle entered) and a live consumer never sees a vehicle that is still inside.
-    - enter_after_dwell: return the held enter as soon as the visit has lasted min_dwell_ms instead, so live
-      enters minus exits tracks occupancy. Same events and timestamps either way; only when they are returned changes.
+    - enter_after_dwell: return the held enter as soon as the visit has lasted min_dwell_ms instead of with its
+      exit. Exits still wait for exit_frames, or lost_ms for a lost track, so a live count of enters minus exits runs
+      ahead of the vehicles inside; for live occupancy use open_visits(now, seen_within_ms) (docs/case-study-balance.md).
+      Same events and timestamps either way; only when they are returned changes.
     - cooldown_ms: after an exit, the same track cannot re-enter for this long.
     - lost_ms: a track that vanishes while inside (tracker dropped it, ID changed, object occluded)
       is closed after this long, stamped with the time it was last seen. Without this, a lost
