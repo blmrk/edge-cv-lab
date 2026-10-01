@@ -146,8 +146,25 @@ Checked on the sim lab with the gauge on (commands in Reproduce): of seed 11's 1
 each equal to the offline replay of the same scene through `OccupancyGauge` at the same timestamp; the missing one is
 the scene's first, sent while the lab was starting. A QoS 0 sample is dropped unless the device is connected and ingest
 has subscribed, and ingest subscribes only once it has reached Postgres. `make delivery` still finds every zone event
-stored once (seeds 11 and 12: 610 expected, 610 stored, none lost, extra or duplicated). The edge's gauge was not run
-live; its image builds and reads both flags (`500 30.0` from the import check in Reproduce).
+stored once (seeds 11 and 12: 610 expected, 610 stored, none lost, extra or duplicated).
+
+The edge ran the gauge live on the MTID clip (`make up-video`: the clip looped through MediaMTX, YOLO and ByteTrack on
+CPU), once with the zone rule and once without, about 290 s each, some 2.7 loops of the clip (commands in Reproduce).
+On CPU it kept up with about half of the 30 fps stream: 15.5 and 14.7 frames a second at the end of each run
+(`device_status`). The runs are not frame-aligned with the annotations, so they are compared by distribution with the
+same clip's offline gauge (over all 3199 frames), not scored frame by frame:
+
+| gauge | samples | mean vehicles in zone | share of samples above 0 | max |
+|---|---|---|---|---|
+| edge, live, `MIN_TRAVEL_PX=30` | 284 in 293.1 s | 0.426 | 0.356 | 3 |
+| edge, live, `MIN_TRAVEL_PX=0` | 280 in 288.0 s | 0.825 | 0.464 | 10 |
+| offline, `min_travel_px=30` | 3199 frames | 0.476 | 0.388 | 3 |
+| offline, `min_travel_px=0` | 3199 frames | 1.135 | 0.477 | 10 |
+
+The annotated mean is 0.384. The zone rule cuts the gauge's mean by half or more (live 0.825 to 0.426, offline 1.135 to
+0.476) and takes its maximum from 10 to 3: without it, phantoms sitting in the zone count as vehicles inside. One run of
+each, not repeated: live figures would vary with the frames the edge keeps up with and with which part of the clip the
+partial third loop covers.
 
 Still open: the edge calls `counter.update()` only for frames that have track boxes, so `expire()` runs only when some box
 arrives, and a visit whose track is lost stays open, as events go, until the next vehicle is detected. On these clips
@@ -159,7 +176,9 @@ camera it would. The gauge reads the clock, so it does not depend on boxes arriv
 - One annotated clip: 3199 frames at 30 fps, 3099 of them annotated. True occupancy uses the annotated boxes' footpoint, the same anchor as the counters: a
   vehicle the annotations miss, or one whose footpoint sits on the wrong side of the zone edge on this oblique view (see
   the counting study's "What did not work"), counts as an error either way.
-- The live and gauge views are replayed offline from the saved tracks, not measured on the running lab or its dashboard.
+- The live and gauge views are scored offline from the saved tracks. On the running lab, the sim's gauge is checked
+  against its offline replay and the edge's live gauge is compared by distribution only, not scored against the
+  annotations; the dashboard itself is not measured.
 - The expressway clip has no annotations, so its open visits are counted, not checked.
 - The zone rule's 30 px, the 3 s `lost_ms` and the 500 ms gauge window were set before measuring; none was tuned here.
 
@@ -245,7 +264,20 @@ print('offline samples', len(off), '| live samples in the scene', len(mine), '| 
 print('offline samples missing live (ms after scene start):', sorted(t - wall0 for t in set(off) - {t for t, _ in mine}))" && cd ..
 make delivery
 make down
-# the edge image builds and reads both flags (no camera or broker needed)
-docker compose --profile video build edge
-docker compose --profile video run --rm --no-deps -e OCCUPANCY_GAUGE_MS=500 -e MIN_TRAVEL_PX=30 edge python -c "import main; print(main.GAUGE_MS, main.MIN_TRAVEL_PX)"
+# the edge gauge live on the MTID clip (media/sample.mp4), with the zone rule and without, about 5 min each
+for px in 30 0; do
+  make down && OCCUPANCY_GAUGE_MS=500 MIN_TRAVEL_PX=$px GRAFANA_PORT=3001 make up-video
+  i=0; until [ "$(docker compose --profile video exec -T postgres psql -U postgres lab -At -c "select count(*) from zone_occupancy where device_id='edge-01'" 2>/dev/null || echo 0)" -ge 280 ]; do i=$((i+1)); [ $i -ge 60 ] && { echo TIMEOUT; break; }; sleep 10; done
+  docker compose --profile video exec -T postgres psql -U postgres lab -At -F ' | ' -c "select device_id, count(*) samples, round(extract(epoch from max(received_at)-min(received_at))::numeric,1) span_s, round(avg(in_zone)::numeric,3) mean, round(avg((in_zone>0)::int)::numeric,3) share_pos, max(in_zone) from zone_occupancy group by 1" -c "select device_id, state, fps from device_status"
+done
+make down
+# the same clip's offline gauge, with and without the zone rule
+cd harness && python -c "
+import json
+from replay import balance; from replay.schema import read_tracks; from replay.zones import DebouncedZoneCounter
+poly = [tuple(p) for p in json.load(open('zone.json'))['polygon']]
+boxes = sorted(read_tracks('runs/bytetrack.agnostic.jsonl'), key=lambda b: (b.frame, b.track_id))
+for px in (0, 30):
+    v = list(balance.gauge(DebouncedZoneCounter(poly, min_travel_px=px), boxes).values())
+    print('offline gauge, min_travel_px', px, '| frames', len(v), '| mean', round(sum(v) / len(v), 3), '| share > 0', round(sum(x > 0 for x in v) / len(v), 3), '| max', max(v))" && cd ..
 ```
