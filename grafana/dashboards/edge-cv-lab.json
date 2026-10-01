@@ -406,7 +406,7 @@
         "type": "postgres",
         "uid": "lab-pg"
       },
-      "description": "A delivery check, not occupancy. The debounced counter sends each enter together with its exit, so this sum is back where it was after every visit; a step that stays means an enter or an exit went missing. Vehicles in the zone: see the gauge panel (docs/case-study-balance.md).",
+      "description": "Not occupancy, and not a delivery check. The debounced counter sends each enter together with its exit, so this sum is back where it was after every visit: a step that stays means half of a visit arrived. A whole visit lost on the way leaves it flat; make delivery checks delivery. Vehicles in the zone: see the gauge panel (docs/case-study-balance.md).",
       "gridPos": {
         "x": 0,
         "y": 22,
