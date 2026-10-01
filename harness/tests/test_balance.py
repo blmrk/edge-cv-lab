@@ -74,3 +74,15 @@ def test_gauge_counts_committed_visits_whose_track_was_seen_recently():
     rows = {r["counter"]: r for r in balance.table(boxes, SQUARE, balance.true_occupancy(boxes, SQUARE))}
     assert rows["debounced"]["gauge_mae"] < rows["debounced"]["live_mae"]
     assert rows["naive, centroid"]["gauge_mae"] is None  # the naive counter keeps no visit state to ask
+
+
+def test_open_visit_reasons_at_their_boundaries():
+    stays = _car(1, range(101), [min(10 * f, 300) for f in range(101)])            # sets the end: frame 100, 10 s
+    gone_at_lost_ms = _car(2, range(71), [min(10 * f, 300) for f in range(71)], y=400)  # last seen 7.0 s: 3.0 s before the end
+    just_left = _car(3, range(101), [10 * f for f in range(101)], y=200)              # crosses out at 5 s, never exits
+    boxes = sorted(stays + gone_at_lost_ms + just_left, key=lambda b: (b.frame, b.track_id))
+    events = [ZoneEvent("enter", t, 1500, 15) for t in (1, 2, 3)]                     # three enters, no exits
+    reasons = {r["track_id"]: r["reason"] for r in balance.open_visits(events, boxes, SQUARE, "footpoint")}
+    assert reasons == {1: "inside at end", 2: "inside at end", 3: "left"}  # exactly lost_ms ago still counts as at end
+    late = [b for b in boxes if not (b.track_id == 2 and b.frame == 70)]  # last seen 6.9 s: 3.1 s before the end
+    assert balance.open_visits(events, late, SQUARE, "footpoint")[1]["reason"] == "lost inside"
