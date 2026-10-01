@@ -23,7 +23,12 @@ CREATE TABLE IF NOT EXISTS ground_truth (
   device_id text NOT NULL, seed int NOT NULL, expected_visits int NOT NULL, ts_ms bigint NOT NULL,
   PRIMARY KEY (device_id, seed)
 );
-CREATE INDEX IF NOT EXISTS zone_events_received_at ON zone_events (received_at);"""
+CREATE INDEX IF NOT EXISTS zone_events_received_at ON zone_events (received_at);
+CREATE TABLE IF NOT EXISTS zone_occupancy (
+  device_id text NOT NULL, counter text NOT NULL, in_zone int NOT NULL, ts_ms bigint NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS zone_occupancy_received_at ON zone_occupancy (received_at);"""
 
 
 def connect():
@@ -39,7 +44,7 @@ def main():
     db.execute(DDL)
 
     def on_connect(c, *_):
-        c.subscribe([("events/+/zone", 1), ("devices/+/status", 1), ("truth/+", 1)])
+        c.subscribe([("events/+/zone", 1), ("devices/+/status", 1), ("truth/+", 1), ("occupancy/+", 0)])
 
     def on_message(_c, _u, msg):
         d = json.loads(msg.payload)
@@ -48,6 +53,9 @@ def main():
                        "VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (event_id) DO NOTHING",
                        (d["event_id"], d["device_id"], d["kind"], d["track_id"], d["ts_ms"],
                         d.get("counter", "debounced")))
+        elif msg.topic.startswith("occupancy/"):  # a gauge sample, sent only by devices with OCCUPANCY_GAUGE_MS set
+            db.execute("INSERT INTO zone_occupancy (device_id, counter, in_zone, ts_ms) VALUES (%s,%s,%s,%s)",
+                       (d["device_id"], d.get("counter", "debounced"), d["in_zone"], d["ts_ms"]))
         elif msg.topic.startswith("truth/"):
             db.execute("INSERT INTO ground_truth VALUES (%s,%s,%s,%s) ON CONFLICT DO NOTHING",
                        (msg.topic.split("/")[1], d["seed"], d["expected_visits"], d["ts_ms"]))
