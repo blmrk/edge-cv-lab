@@ -1,6 +1,6 @@
 # Handover
 
-Last updated 2026-09-28. Everything below has been run unless marked otherwise.
+Last updated 2026-10-01. Everything below has been run unless marked otherwise.
 
 ## Status
 
@@ -61,8 +61,8 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
     `open_visits(now, seen_within_ms)`, both unused by the edge and the sim; `docs/case-study-balance.md`.
 
 ## Known rough edges
-- The edge and the sim publish each debounced enter together with its exit (the counter holds enters until a visit
-  closes), so the Grafana panel "Net balance: enters minus exits (debounced)", a running sum over `received_at`, never
+- From the code, not a run of the lab: the edge and the sim publish each debounced enter together with its exit (the
+  counter holds enters until a visit closes), so the Grafana panel "Net balance: enters minus exits (debounced)", a running sum over `received_at`, never
   shows a vehicle still inside. `docs/case-study-balance.md` measures a gauge (`open_visits(now, seen_within_ms=500)`
   with `min_travel_px=30`) as the live occupancy; the services do not publish it yet.
 - The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
