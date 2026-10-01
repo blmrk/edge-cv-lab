@@ -311,11 +311,15 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT device_id, state, fps, round(extract(epoch FROM now()-updated_at)) AS seconds_since_heartbeat FROM device_status ORDER BY 1"
+          "rawSql": "SELECT device_id, state, fps, round(extract(epoch FROM now()-updated_at)) AS last_seen_s FROM device_status ORDER BY 1"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "custom": {
+            "minWidth": 60
+          }
+        },
         "overrides": []
       },
       "options": {}
