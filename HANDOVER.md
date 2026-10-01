@@ -11,7 +11,7 @@ Last updated 2026-10-01. Everything below has been run unless marked otherwise.
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
 | Tracker bench: greedy_iou, groundplane, ByteTrack (Ultralytics, from video or `bytetrack` on saved detections), MOT bridge, TrackEval runner | tested; **boxmot adapter untested** (needs torch) |
-| Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken |
+| Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken; opt-in occupancy gauge (`OCCUPANCY_GAUGE_MS=500`) checked on the sim, **not run on the video edge** |
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
 | Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
@@ -58,13 +58,16 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
     pinned to ubuntu-24.04.
 12. Zone enter/exit balance case study (task B): `replay.balance` (open visits by reason; occupancy after the fact, live
     and as a gauge, against MTID's annotated tracks); opt-in `DebouncedZoneCounter(enter_after_dwell=True)` and
-    `open_visits(now, seen_within_ms)`, both unused by the edge and the sim; `docs/case-study-balance.md`.
+    `open_visits(now, seen_within_ms)`; `docs/case-study-balance.md`.
+13. Occupancy gauge in the services, off by default: `replay.gauge.OccupancyGauge`; `OCCUPANCY_GAUGE_MS` (edge, sim) and
+    `MIN_TRAVEL_PX` (edge) in compose; topic `occupancy/<device>` at QoS 0, ingest table `zone_occupancy`, Grafana panel
+    "Vehicles in zone (gauge, opt-in)"; the event-sum panel relabelled as a delivery check.
 
 ## Known rough edges
-- From the code, not a run of the lab: the edge and the sim publish each debounced enter together with its exit (the
-  counter holds enters until a visit closes), so the Grafana panel "Net balance: enters minus exits (debounced)", a running sum over `received_at`, never
-  shows a vehicle still inside. `docs/case-study-balance.md` measures a gauge (`open_visits(now, seen_within_ms=500)`
-  with `min_travel_px=30`) as the live occupancy; the services do not publish it yet.
+- The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard is a
+  delivery check, not occupancy (now titled "Enters minus exits, as received"). Occupancy comes only from the opt-in
+  gauge. `docs/screenshots/grafana-outage.png` predates the relabel and the gauge panel (old title, `in_zone` series);
+  recapture it with the steps in README's comment, and note the dashboard is now one row taller.
 - The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
   on a quiet camera a lost visit stays open until then.
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
