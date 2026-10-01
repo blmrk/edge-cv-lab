@@ -136,10 +136,11 @@ make broker-restart           # fresh lab, ~5 min: ingest away across a broker r
 | Events lost when the broker restarts | Subscriber session kept only in broker memory | EMQX durable sessions on disk | lab + `make broker-restart` |
 | Double counting after reconnect | At-least-once redelivery | ULID `event_id` + `ON CONFLICT DO NOTHING` | lab + `outage` |
 | Next car inherits the previous car's ID, merging visits | IoU association plus a track left parked where a vehicle vanished | Ground-contact association with a lane-shaped gate and damped coasting | `queue.dets.jsonl` |
+| Zone occupancy never returns to zero, and a live "in zone" sum never shows a vehicle inside | Visits whose track is lost are never closed; the debounced counter holds each enter until its visit closes | Close a visit 3 s after its track goes silent; read occupancy as a gauge of visits seen in the last 500 ms, with the zone rule (both opt-in) | real clip, `replay.balance`; [docs/case-study-balance.md](docs/case-study-balance.md) |
 | Lane marking inside the zone counted as a visit | Detector scores it as a car at low confidence; ByteTrack keeps low-score boxes | Zone rule: a track must move `min_travel_px` before it can enter (off by default) | real clip, `replay.phantoms`; `test_zones.py` |
 | "Online" device that is actually dead | Health inferred from network reachability | App-level heartbeat with FPS, plus MQTT last-will | lab |
 
-Roadmap: published trackers (FastTracker, UCMCTrack, TrackTrack) on real footage through the MOT bridge, scored with TrackEval; a fix for boxes straddling two side-by-side vehicles (found and counted in [docs/case-study-phantoms.md](docs/case-study-phantoms.md), not fixed), entry/exit net-balance reconciliation, broker drain test on kind + EMQX Operator.
+Roadmap: published trackers (FastTracker, UCMCTrack, TrackTrack) on real footage through the MOT bridge, scored with TrackEval; a fix for boxes straddling two side-by-side vehicles (found and counted in [docs/case-study-phantoms.md](docs/case-study-phantoms.md), not fixed), broker drain test on kind + EMQX Operator.
 
 ## Design notes
 
