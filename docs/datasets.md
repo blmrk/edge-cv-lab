@@ -39,8 +39,30 @@ To make an mp4 for `tools/label.html` or the lab's RTSP camera:
 `ffmpeg -framerate 25 -i ../media/UA-DETRAC/Insight-MVT_Annotation_Train/MVI_20011/img%05d.jpg -c:v libx264 -pix_fmt yuv420p ../media/MVI_20011.mp4`
 (`media/` is gitignored; it is research data).
 
-The converter was written against the documented annotation format and tested on a synthetic file,
-not on a downloaded sequence. If a real file fails to parse, the element names are the first thing to check.
+One test sequence can be fetched on its own instead of the multi-GB set: an mp4 of its frames plus its XML, from the
+Kaggle mirrors logged in `media/SOURCES.md` (MVI_40714, the task C clip: 46317496 and 11609640 bytes). The mp4 is an
+uploader's encode, so check it lines up with the annotations before using it: `ffprobe -count_frames` must give the
+XML's frame count at 25 fps, and a few original JPEGs must match decoded frames n-1. For MVI_40714 both hold: 1180
+frames, and img00001, img00590 and img01180 match decoded frames 0, 589 and 1179 best. Then run the detector on the mp4
+with `--fps 25`. The converter parses the real XML: 33749 boxes in 62 tracks over all 1180 frames, 186 boxes dropped
+in three ignored regions.
+
+```bash
+cd media/UA-DETRAC
+ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_read_frames MVI_40714.mp4
+python3 -c "
+import cv2, numpy as np
+cap = cv2.VideoCapture('MVI_40714.mp4'); frames = []
+while True:
+    ok, f = cap.read()
+    if not ok: break
+    frames.append(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY).astype(np.float32))
+for n in (1, 590, 1180):
+    j = cv2.imread(f'check/img{n:05d}.jpg', cv2.IMREAD_GRAYSCALE).astype(np.float32)
+    d = {k: round(float(np.abs(frames[k] - j).mean()), 2) for k in range(n - 3, n + 2) if 0 <= k < len(frames)}
+    print(f'img{n:05d}.jpg best matches decoded frame', min(d, key=d.get), d)"
+cd ../../harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/MVI_40714.xml --out runs/MVI_40714
+```
 
 Citation: Wen et al., "UA-DETRAC: A New Benchmark and Protocol for Multi-Object Detection and Tracking",
 Computer Vision and Image Understanding, 2020.
