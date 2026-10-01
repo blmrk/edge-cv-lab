@@ -1,7 +1,8 @@
 # Case study: zone enter/exit balance
 
 > Status: measured offline on two public clips, one with annotated vehicle tracks. Every measured figure comes from a
-> command in Reproduce. The live lab was not run for this study; statements about the live services come from their code.
+> command in Reproduce. The live lab was run only to check the opt-in gauge (In the live services); other statements about
+> the services come from their code.
 
 ## Problem
 
@@ -105,7 +106,8 @@ truth than saying "empty" (0.486 against 0.384). The zone rule removes the stati
 returns it together with its exit, stamped with the time the vehicle entered (a test in `harness/tests/test_zones.py`
 pins this). So a consumer reading the events as they arrive never sees a vehicle that is still inside: every debounced
 row that holds its enters scores 0.384 live, exactly what "always empty" scores. The lab's Grafana panel "Net balance: enters minus exits
-(debounced)" is that consumer: it sums events in the order they arrive (`received_at`) and labels the result `in_zone`.
+(debounced)" was that consumer: it sums events in the order they arrive (`received_at`) and labelled the result `in_zone`
+(relabelled since; see In the live services).
 From the code, not from a run of the lab: each debounced enter arrives together with its exit, so the sum is back where
 it was after every visit and never shows a vehicle that is still inside.
 
@@ -122,17 +124,32 @@ it was after every visit and never shows a vehicle that is still inside.
   event, but a phantom is seen in every frame: 0.8 on ByteTrack, worse than "always empty". With the zone rule it is 0.18
   on ByteTrack and 0.171 on `greedy_iou:max_age=5`, the closest live view to the truth here; the two fixes need each other.
 
-## What the live services would need
+## In the live services (opt-in)
 
-Not changed in this study (the services keep every default). From the measurements above:
+The edge and the sim keep every default. Two flags, both 0 (off) unless set, turn on the pair measured above:
 
-- Publish occupancy as a gauge from the counter's state (`open_visits(now, seen_within_ms=500)`) with the zone rule on,
-  instead of deriving it from events. With the default counter the panel's running enters minus exits is back where it
-  was after every visit: it shows that each enter met its exit, not occupancy. Relabel it, or replace it with the gauge.
-- The edge calls `counter.update()` only for frames that have track boxes, so `expire()` runs only when some box
-  arrives: a visit whose track is lost stays open until the next vehicle is detected. On these clips that never mattered
-  (every ByteTrack frame has a box, and `greedy_iou:max_age=5` lacks one in 7 frames), but on a quiet camera it would.
-  The gauge takes the current time, so it would not depend on boxes arriving.
+- `OCCUPANCY_GAUGE_MS=500` (edge and sim): the device publishes `{device_id, counter, in_zone, ts_ms}` to
+  `occupancy/<device>` once a second, from `OccupancyGauge` (`harness/replay/gauge.py`, the gauge view above). QoS 0: a
+  stale sample is not worth queueing through an outage, so samples sent while the uplink is down are dropped. Ingest
+  stores them in `zone_occupancy` and Grafana plots them in "Vehicles in zone (gauge, opt-in)". The edge samples on
+  every frame, detections or not, so a track that goes quiet drops out without waiting for the next box.
+- `MIN_TRAVEL_PX=30` (edge only): the zone rule, without which the gauge counts phantoms. The sim's synthetic traffic
+  has none.
+
+The panel that summed events is now "Enters minus exits, as received (debounced)", series `enters_minus_exits`, and
+describes itself as a delivery check: with the default counter it is back where it was after every visit, so a step
+that stays means an enter or an exit went missing.
+
+Checked on the sim lab with the gauge on (commands in Reproduce): of seed 11's 131 samples, 130 reached the database,
+each equal to the offline replay of the same scene through `OccupancyGauge` at the same timestamp; the missing one is
+the scene's first, published before the device's MQTT connection was up. `make delivery` still finds every zone event
+stored once (seeds 11 and 12: 610 expected, 610 stored, none lost, extra or duplicated). The edge's gauge was not run
+live; its image builds and imports.
+
+Still open: the edge calls `counter.update()` only for frames that have track boxes, so `expire()` runs only when some box
+arrives, and a visit whose track is lost stays open, as events go, until the next vehicle is detected. On these clips
+that never mattered (every ByteTrack frame has a box, and `greedy_iou:max_age=5` lacks one in 7 frames), but on a quiet
+camera it would. The gauge reads the clock, so it does not depend on boxes arriving.
 
 ## Limitations
 
@@ -204,4 +221,25 @@ for name, kw in (('debounced', {}), ('debounced + zone rule 30 px', dict(min_tra
     print('  enter frames of 769, 779, 808:', [(e.track_id, e.frame) for e in ev if e.kind == 'enter' and e.track_id in (769, 779, 808)])"
 # the phantom study's --explain lists tracks 779 and 808 among the static enters
 python -m replay.score --tracks runs/bytetrack.agnostic.jsonl --zone zone.json --truth truth.json --explain
+# the opt-in gauge on the sim lab, about 5 min (seed 11 is the first scene; GRAFANA_PORT=3001 when 3000 is taken)
+cd .. && make down && OCCUPANCY_GAUGE_MS=500 GRAFANA_PORT=3001 make up
+i=0; until docker compose logs sim | grep -q "seed 12 done"; do i=$((i+1)); [ $i -ge 60 ] && { echo TIMEOUT; break; }; sleep 10; done
+docker compose exec -T postgres psql -U postgres lab -At -F, -c "select ts_ms, in_zone from zone_occupancy order by ts_ms" > harness/runs/gauge.csv
+docker compose exec -T postgres psql -U postgres lab -At -F, -c "select ts_ms from zone_events where counter='debounced' order by ts_ms limit 1" > harness/runs/events.csv
+cd harness && python -c "
+from replay.gauge import OccupancyGauge; from replay.synth import ZONE, by_frame, generate_traffic; from replay.zones import DebouncedZoneCounter, run
+live = [tuple(map(int, l.split(','))) for l in open('runs/gauge.csv').read().split()]
+first_live = min(int(l.split(',')[0]) for l in open('runs/events.csv').read().split())
+boxes, _ = generate_traffic(seed=11)
+first = min(run(DebouncedZoneCounter(ZONE), sorted(boxes, key=lambda b: (b.frame, b.track_id))), key=lambda e: e.ts_ms)
+wall0 = first_live - int(first.ts_ms / 2)  # the sim runs at SPEED 2
+c = DebouncedZoneCounter(ZONE); g = OccupancyGauge(c, 500, every_ms=2000); off = {}
+for f, bucket in by_frame(boxes):
+    for b in bucket: c.update(b)
+    if (n := g.sample(bucket[0].ts_ms)) is not None: off[wall0 + int(bucket[0].ts_ms / 2)] = n
+mine = [(t, n) for t, n in live if t <= max(off)]
+print('offline samples', len(off), '| live samples in the scene', len(mine), '| all equal at the same ts:', all(off.get(t) == n for t, n in mine))
+print('offline samples missing live (ms after scene start):', sorted(t - wall0 for t in set(off) - {t for t, _ in mine}))" && cd ..
+make delivery
+make down
 ```
