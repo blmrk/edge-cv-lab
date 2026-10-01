@@ -189,3 +189,18 @@ def test_open_visits_seen_within_drops_a_visit_whose_track_went_quiet():
     assert [tid for tid, _ in c.open_visits(3500)] == [1]  # still open: lost_ms has not run out
     assert [tid for tid, _ in c.open_visits(3500, seen_within_ms=500)] == [1]  # seen 0.5 s ago: still counted
     assert c.open_visits(3600, seen_within_ms=500) == []  # 0.6 s since it was seen: no longer counted
+
+
+def test_enter_after_dwell_with_no_min_dwell_returns_the_enter_from_the_commit_box():
+    car = _drive_through(90)
+    entered = run(DebouncedZoneCounter(POLY, min_dwell_ms=0), car)[0]
+    got = _returned_by(DebouncedZoneCounter(POLY, min_dwell_ms=0, enter_after_dwell=True), car)
+    assert got[0] == (entered.frame, "enter")
+
+
+def test_enter_after_dwell_returns_enter_then_exit_when_dwell_is_proven_on_the_exit_box():
+    car = _drive_through(90)
+    enter, exit_ = run(DebouncedZoneCounter(POLY), car)
+    dwell = exit_.ts_ms - enter.ts_ms  # dwell is proven on the very box that commits the exit
+    got = _returned_by(DebouncedZoneCounter(POLY, min_dwell_ms=dwell, enter_after_dwell=True), car)
+    assert got == [(exit_.frame, "enter"), (exit_.frame, "exit")]

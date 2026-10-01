@@ -123,12 +123,12 @@ class DebouncedZoneCounter:
         return out
 
     def update(self, box: TrackBox) -> list[ZoneEvent]:
-        expired = self.expire(box.ts_ms)
-        s = self._s.get(box.track_id)
-        released = []
-        if self.enter_after_dwell and s and s.pending and box.ts_ms - s.entered_ts >= self.min_dwell_ms:
-            released, s.pending = [s.pending], None
-        return expired + released + self._update(box)
+        out = self.expire(box.ts_ms) + self._update(box)
+        s = self._s[box.track_id]  # after _update: a visit closed by this box has already returned its enter
+        if self.enter_after_dwell and s.pending and box.ts_ms - s.entered_ts >= self.min_dwell_ms:
+            out.append(s.pending)
+            s.pending = None
+        return out
 
     def _update(self, box: TrackBox) -> list[ZoneEvent]:
         s = self._s.setdefault(box.track_id, _State())
