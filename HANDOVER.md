@@ -6,7 +6,7 @@ Last updated 2026-10-01. Everything below has been run unless marked otherwise.
 
 | Piece | State |
 |---|---|
-| Replay harness, 123 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 129 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
@@ -61,12 +61,12 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
     `open_visits(now, seen_within_ms)`; `docs/case-study-balance.md`.
 13. Occupancy gauge in the services, off by default: `replay.gauge.OccupancyGauge`; `OCCUPANCY_GAUGE_MS` (edge, sim) and
     `MIN_TRAVEL_PX` (edge) in compose; topic `occupancy/<device>` at QoS 0, ingest table `zone_occupancy`, Grafana panel
-    "Vehicles in zone (gauge, opt-in)"; the event-sum panel relabelled as a delivery check.
+    "Vehicles in zone (gauge, opt-in)"; the event-sum panel relabelled: not occupancy, not a delivery check.
 
 ## Known rough edges
-- The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard is a
-  delivery check, not occupancy (now titled "Enters minus exits, as received"). Occupancy comes only from the opt-in
-  gauge. `docs/screenshots/grafana-outage.png` predates the relabel and the gauge panel (old title, `in_zone` series);
+- The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard (now
+  "Enters minus exits, as received") shows neither occupancy nor delivery: a visit lost whole leaves it flat.
+  Occupancy comes only from the opt-in gauge; `make delivery` checks delivery. `docs/screenshots/grafana-outage.png` predates the relabel and the gauge panel (old title, `in_zone` series);
   recapture it with the steps in README's comment, and note the dashboard is now one row taller.
 - The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
   on a quiet camera a lost visit stays open until then.
