@@ -131,20 +131,23 @@ The edge and the sim keep every default. Two flags, both 0 (off) unless set, tur
 - `OCCUPANCY_GAUGE_MS=500` (edge and sim): the device publishes `{device_id, counter, in_zone, ts_ms}` to
   `occupancy/<device>` once a second, from `OccupancyGauge` (`harness/replay/gauge.py`, the gauge view above). QoS 0: a
   stale sample is not worth queueing through an outage, so samples sent while the uplink is down are dropped. Ingest
-  stores them in `zone_occupancy` and Grafana plots them in "Vehicles in zone (gauge, opt-in)". The edge samples on
+  stores them in `zone_occupancy` and Grafana plots them in "Vehicles in zone (gauge, opt-in)", at each sample's device
+  time rather than its arrival. The edge samples on
   every frame, detections or not, so a track that goes quiet drops out without waiting for the next box.
 - `MIN_TRAVEL_PX=30` (edge only): the zone rule, without which the gauge counts phantoms. The sim's synthetic traffic
   has none.
 
-The panel that summed events is now "Enters minus exits, as received (debounced)", series `enters_minus_exits`, and
-describes itself as a delivery check: with the default counter it is back where it was after every visit, so a step
-that stays means an enter or an exit went missing.
+The panel that summed events is now "Enters minus exits, as received (debounced)", series `enters_minus_exits`. With
+the default counter it is back where it was after every visit, so a step that stays means half of a visit arrived. It
+is not a delivery check: enter and exit travel together, so a visit lost on the way, both messages, leaves it flat.
+`make delivery` checks delivery.
 
 Checked on the sim lab with the gauge on (commands in Reproduce): of seed 11's 131 samples, 130 reached the database,
 each equal to the offline replay of the same scene through `OccupancyGauge` at the same timestamp; the missing one is
-the scene's first, published before the device's MQTT connection was up. `make delivery` still finds every zone event
+the scene's first, sent while the lab was starting. A QoS 0 sample is dropped unless the device is connected and ingest
+has subscribed, and ingest subscribes only once it has reached Postgres. `make delivery` still finds every zone event
 stored once (seeds 11 and 12: 610 expected, 610 stored, none lost, extra or duplicated). The edge's gauge was not run
-live; its image builds and imports.
+live; its image builds and reads both flags (`500 30.0` from the import check in Reproduce).
 
 Still open: the edge calls `counter.update()` only for frames that have track boxes, so `expire()` runs only when some box
 arrives, and a visit whose track is lost stays open, as events go, until the next vehicle is detected. On these clips
@@ -242,4 +245,7 @@ print('offline samples', len(off), '| live samples in the scene', len(mine), '| 
 print('offline samples missing live (ms after scene start):', sorted(t - wall0 for t in set(off) - {t for t, _ in mine}))" && cd ..
 make delivery
 make down
+# the edge image builds and reads both flags (no camera or broker needed)
+docker compose --profile video build edge
+docker compose --profile video run --rm --no-deps -e OCCUPANCY_GAUGE_MS=500 -e MIN_TRAVEL_PX=30 edge python -c "import main; print(main.GAUGE_MS, main.MIN_TRAVEL_PX)"
 ```
