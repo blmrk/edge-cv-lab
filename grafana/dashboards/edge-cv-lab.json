@@ -488,7 +488,7 @@
         "type": "postgres",
         "uid": "lab-pg"
       },
-      "description": "Committed visits whose track was seen in the last OCCUPANCY_GAUGE_MS, one sample a second per device, plotted at the device's sample time, not its arrival. Empty unless a device runs with OCCUPANCY_GAUGE_MS set (off by default); the measured setting is 500, with MIN_TRAVEL_PX=30 on the edge (docs/case-study-balance.md).",
+      "description": "Committed visits whose track was seen in the last OCCUPANCY_GAUGE_MS, one sample a second per device, plotted at the device's sample time, not its arrival; a gap means no sample arrived (QoS 0 drops them while the uplink is down). Empty unless a device runs with OCCUPANCY_GAUGE_MS set (off by default); the measured setting is 500, with MIN_TRAVEL_PX=30 on the edge (docs/case-study-balance.md).",
       "gridPos": {
         "x": 0,
         "y": 30,
@@ -514,7 +514,8 @@
             "drawStyle": "line",
             "lineInterpolation": "stepAfter",
             "fillOpacity": 15,
-            "spanNulls": true
+            "spanNulls": 3000,
+            "insertNulls": 3000
           }
         },
         "overrides": []
