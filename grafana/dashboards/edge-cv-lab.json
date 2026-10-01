@@ -400,13 +400,13 @@
     },
     {
       "id": 9,
-      "title": "Net balance: enters minus exits (debounced)",
+      "title": "Enters minus exits, as received (debounced)",
       "type": "timeseries",
       "datasource": {
         "type": "postgres",
         "uid": "lab-pg"
       },
-      "description": "Should hover near zero and never drift. Persistent drift means missed enters or exits.",
+      "description": "A delivery check, not occupancy. The debounced counter sends each enter together with its exit, so this sum is back where it was after every visit; a step that stays means an enter or an exit went missing. Vehicles in the zone: see the gauge panel (docs/case-study-balance.md).",
       "gridPos": {
         "x": 0,
         "y": 22,
@@ -423,7 +423,7 @@
           "format": "time_series",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT received_at AS time, sum(CASE kind WHEN 'enter' THEN 1 ELSE -1 END) OVER (ORDER BY received_at) AS in_zone FROM zone_events WHERE counter='debounced' AND $__timeFilter(received_at) ORDER BY 1"
+          "rawSql": "SELECT received_at AS time, sum(CASE kind WHEN 'enter' THEN 1 ELSE -1 END) OVER (ORDER BY received_at) AS enters_minus_exits FROM zone_events WHERE counter='debounced' AND $__timeFilter(received_at) ORDER BY 1"
         }
       ],
       "fieldConfig": {
@@ -479,6 +479,46 @@
       "options": {
         "bucketSize": 1
       }
+    },
+    {
+      "id": 11,
+      "title": "Vehicles in zone (gauge, opt-in)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "postgres",
+        "uid": "lab-pg"
+      },
+      "description": "Committed visits whose track was seen in the last OCCUPANCY_GAUGE_MS, one sample a second per device. Empty unless a device runs with OCCUPANCY_GAUGE_MS set (off by default); the measured setting is 500, with MIN_TRAVEL_PX=30 on the edge (docs/case-study-balance.md).",
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "postgres",
+            "uid": "lab-pg"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT received_at AS time, device_id AS metric, in_zone FROM zone_occupancy WHERE counter='debounced' AND $__timeFilter(received_at) ORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      },
+      "options": {}
     }
   ],
   "templating": {
