@@ -15,7 +15,7 @@ Last updated 2026-10-01. Everything below has been run unless marked otherwise.
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
 | Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
-| `scripts/detrac_to_gt.py` | tested on a synthetic XML only, **not on a real UA-DETRAC file** (task deferred) |
+| `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth not yet run on it |
 
 ## Case studies
 
@@ -35,14 +35,19 @@ The repo's story is four field failures, each written up as its own case study u
   two vehicles, by three visual passes. The zone rule keeps both; a birth score of 0.5 removes one and 9 other enters
   whose truth is unknown. `replay.between` flags candidates but misses track 451: in 130 of its 158 frames fewer than two
   other boxes cover a fifth of it without matching it, so there is no pair to bridge.
-- Needs a dense clip with visit labels (`tools/label.html`) before any fix can be scored. Candidate: drop a box mostly
+- Clip chosen: UA-DETRAC test sequence MVI_40714 (`media/UA-DETRAC/`, metrics only, logged in `media/SOURCES.md`). Fixed
+  elevated view, the near-left carriageway queued several abreast. Its annotated boxes with track IDs give both kinds
+  of truth without hand labels: a straddle is a detection that matches no annotated box but lies across two, and
+  visits come from `detrac_to_gt.py --zone`. The mp4 is frame-aligned with the XML (checked, `docs/datasets.md`).
+  Next: a zone on the queued carriageway, clear of the ignored regions; a straddle scorer (reuse `between.bridge`
+  geometry on the annotated boxes, and mask detections in the ignored regions too); the baseline; then a fix.
+- Candidate fix: drop a box mostly
   covered by two higher-scoring boxes, and check it keeps a car seen in the gap between two nearer ones; track 451 shows
   a straddle with fewer than two boxes around it, which that rule would not catch.
 
 ### Deferred
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.
 - boxmot adapter: `pip install boxmot`, fix `update()` columns, add `boxmot_bytetrack` and `boxmot_ocsort` rows.
-- UA-DETRAC sequence: a second, research-licensed dataset (metrics and citation only, no frames); multi-GB download.
 - Published tracker (FastTracker or UCMCTrack) through `replay.motformat` and `scripts/trackeval_run.py`.
 
 ### Done
