@@ -66,8 +66,7 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
 ## Known rough edges
 - The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard (now
   "Enters minus exits, as received") shows neither occupancy nor delivery: a visit lost whole leaves it flat.
-  Occupancy comes only from the opt-in gauge; `make delivery` checks delivery. `docs/screenshots/grafana-outage.png` predates the relabel and the gauge panel (old title, `in_zone` series);
-  recapture it with the steps in README's comment, and note the dashboard is now one row taller.
+  Occupancy comes only from the opt-in gauge; `make delivery` checks delivery.
 - The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
   on a quiet camera a lost visit stays open until then.
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
