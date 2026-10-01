@@ -6,7 +6,7 @@ Last updated 2026-09-28. Everything below has been run unless marked otherwise.
 
 | Piece | State |
 |---|---|
-| Replay harness, 112 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 123 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
@@ -26,14 +26,9 @@ The repo's story is four field failures, each written up as its own case study u
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is found and counted, not fixed (task C) |
-| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | next (task B) |
+| Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
-
-### B. Zone enter/exit balance case study
-- Starting point: the naive counter's net balance (enters minus exits) is 66 on ByteTrack, the debounced counter's 3
-  (`replay.cli`). Work out what a standing imbalance means per zone and how to reconcile it.
-- Done: `docs/case-study-balance.md` with measured figures and commands.
 
 ### C. A fix for boxes straddling two side-by-side vehicles
 - Found on a dense expressway clip (`media/vecteezy-6434705.mp4`, metrics only): 2 of 52 zone enters sit on a box across
@@ -61,8 +56,17 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
 11. Phantom boxes case study (task A): `min_travel_px` zone rule (default 0, off in the edge and the sim), `bytetrack`
     replay tracker, `replay.phantoms`, `replay.between`; `docs/case-study-phantoms.md`. CI actions bumped to v7, runner
     pinned to ubuntu-24.04.
+12. Zone enter/exit balance case study (task B): `replay.balance` (open visits by reason; occupancy after the fact, live
+    and as a gauge, against MTID's annotated tracks); opt-in `DebouncedZoneCounter(enter_after_dwell=True)` and
+    `open_visits(now, seen_within_ms)`, both unused by the edge and the sim; `docs/case-study-balance.md`.
 
 ## Known rough edges
+- The edge and the sim publish each debounced enter together with its exit (the counter holds enters until a visit
+  closes), so the Grafana panel "Net balance: enters minus exits (debounced)", a running sum over `received_at`, never
+  shows a vehicle still inside. `docs/case-study-balance.md` measures a gauge (`open_visits(now, seen_within_ms=500)`
+  with `min_travel_px=30`) as the live occupancy; the services do not publish it yet.
+- The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
+  on a quiet camera a lost visit stays open until then.
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
   on 2026-09-28; the image installs `ultralytics>=8.3` unpinned, so a rebuild can bring a release with another signature.
 - ByteTrack fails the queue fixture at its defaults (1 of 6 visits, 5 ID transfers): the phantom study's stopped-car
