@@ -9,6 +9,7 @@ import time
 import paho.mqtt.client as mqtt
 from ulid import ULID
 
+from replay.gauge import OccupancyGauge
 from replay.synth import FPS, ZONE, by_frame, generate_traffic
 from replay.zones import DebouncedZoneCounter, NaiveZoneCounter
 
@@ -18,6 +19,8 @@ HOST, PORT = os.environ.get("MQTT_HOST", "toxiproxy"), int(os.environ.get("MQTT_
 # Zone events only. 0 = fire-and-forget, the failure the uplink drill measures; truth and heartbeat stay at 1,
 # since the delivery check needs each scene's truth to know the scene finished.
 QOS = int(os.environ.get("QOS", "1"))
+# 0 = off (default). Set, e.g. 500, to publish the debounced counter's vehicles in the zone once a second (QoS 0).
+GAUGE_MS = int(os.environ.get("OCCUPANCY_GAUGE_MS", "0"))
 
 
 def main():
@@ -32,6 +35,7 @@ def main():
     while True:
         boxes, truth = generate_traffic(seed=seed)
         counters = {"naive": NaiveZoneCounter(ZONE, "centroid"), "debounced": DebouncedZoneCounter(ZONE)}
+        gauge = OccupancyGauge(counters["debounced"], GAUGE_MS, every_ms=int(1000 * SPEED))  # scene time: 1 s of wall
         t0, wall0, last_hb, n = time.monotonic(), time.time_ns() // 1_000_000, 0.0, 0
         for frame, bucket in by_frame(boxes):
             delay = t0 + frame / FPS / SPEED - time.monotonic()
@@ -45,6 +49,9 @@ def main():
                         c.publish(f"events/{DEVICE}/zone", json.dumps({
                             "event_id": str(ULID()), "device_id": DEVICE, "counter": name, "kind": ev.kind,
                             "track_id": seed * 1000 + ev.track_id, "ts_ms": wall0 + int(ev.ts_ms / SPEED)}), qos=QOS)
+            if (in_zone := gauge.sample(bucket[0].ts_ms)) is not None:
+                c.publish(f"occupancy/{DEVICE}", json.dumps({"device_id": DEVICE, "counter": "debounced", "in_zone": in_zone,
+                                                             "ts_ms": wall0 + int(bucket[0].ts_ms / SPEED)}), qos=0)
             if time.monotonic() - last_hb > 10:
                 fps = n / (time.monotonic() - last_hb) if last_hb else FPS * SPEED
                 c.publish(f"devices/{DEVICE}/status", json.dumps({"state": "online", "fps": round(fps, 1)}),
