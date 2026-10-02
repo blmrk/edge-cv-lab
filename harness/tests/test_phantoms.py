@@ -64,3 +64,16 @@ def test_table_has_a_row_per_step_and_counts_the_queue_cars_that_stop(monkeypatc
     assert [(r["queue_matched"], r["queue_false"]) for r in rows] == [  # the dash is the queue's one false visit
         (6, 1), (6, 0), (6, 1), ("n/a", "n/a"), ("n/a", "n/a"), (6, 0), (3, 2), (1, 1)]  # masks drop stopped cars
     assert {"new_track_thresh": 0.4} in [p for n, p in params] and {"new_track_thresh": 0.5} in [p for n, p in params]
+
+
+def test_table_runs_only_the_steps_it_is_given_in_their_order(monkeypatch):
+    monkeypatch.setattr(phantoms, "create", lambda name, **p: create("groundplane"))
+    dets = read_detections(FX / "queue.dets.jsonl")
+    poly = [tuple(p) for p in json.loads((FX / "zone.json").read_text())["polygon"]]
+    truth = json.loads((FX / "queue.truth.json").read_text())["enters_ms"]
+    steps = [phantoms.STEPS[1], phantoms.STEPS[0]]
+
+    rows, tracks = phantoms.table(dets, poly, truth, steps=steps)
+
+    assert [r["step"] for r in rows] == [s[1] for s in steps]
+    assert list(tracks) == ["travel30", "baseline"]

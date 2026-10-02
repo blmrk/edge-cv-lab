@@ -82,10 +82,11 @@ def _track(dets, params, keep, tracker="bytetrack"):
     return sorted(boxes, key=lambda b: (b.frame, b.track_id))
 
 
-def table(dets, poly, truth_ms, queue=None, tol_ms: int = 2000):
-    """One row per step, plus each step's tracks by key. queue: (dets, polygon, enters_ms) scored the same way."""
+def table(dets, poly, truth_ms, queue=None, tol_ms: int = 2000, steps=None):
+    """One row per step, plus each step's tracks by key. queue: (dets, polygon, enters_ms) scored the same way.
+    steps: rows shaped like STEPS (None: STEPS)."""
     rows, tracks = [], {}
-    for key, step, params, keep, counter in STEPS:
+    for key, step, params, keep, counter in STEPS if steps is None else steps:
         tracks[key] = _track(dets, params, keep)
         found, s = explain(tracks[key], poly, truth_ms, tol_ms, **counter)
         m = match([r["ts_ms"] for r in found], truth_ms, tol_ms)
