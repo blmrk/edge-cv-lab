@@ -17,7 +17,7 @@ Last updated 2026-10-02. Everything below has been run unless marked otherwise.
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
-| `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run on the host on the saved baseline files of MVI_40714 and MTID only (`--tracks`, baseline labels), for the declared design in `docs/case-study-straddles.md`; `--dets` and the `--iou` dumps **not yet run** |
+| `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run in the edge image on MVI_40714 and MTID, every step (`--dets`, both clips dumped again at NMS IoU 0.7 and 0.5), and on the host on the saved baseline files (`--tracks`); results in `docs/case-study-straddles.md` |
 
 ## Case studies
 
@@ -29,7 +29,7 @@ kind has a follow-up study of its own (task C):
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is found and counted, not fixed (task C) |
-| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | baseline measured; the fix moved to second boxes, its design declared, its steps not run: `docs/case-study-straddles.md` (task C) |
+| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | baseline measured; the fix moved to second boxes and its declared steps ran: by the declared rule contain090_same wins, measured in the replay harness only: `docs/case-study-straddles.md` (task C, next step open) |
 | Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
@@ -71,13 +71,28 @@ kind has a follow-up study of its own (task C):
   per-detection labels and enters put down by vehicle (`replay.secondbox`); seven steps, each one change against the
   ByteTrack baseline (a box 0.8 or 0.9 of its own area inside a higher-scoring box dropped, with and without the same
   class; track birth score 0.4 and 0.5; NMS IoU 0.5 instead of 0.7); and a winner rule (all 26 vehicles the baseline
-  finds still found, fewer than 9 extra enters, no harm on MTID). The baseline figures it quotes are measured on the
-  saved files on the host (the study's Reproduce); the Results tables are TBD.
-- Next: commit the declared design, then run the steps in the edge image, the commands marked not run yet at the end
-  of the study's Reproduce (no build, no download): dump both clips again at NMS IoU 0.7 and 0.5, compare the 0.7 dumps
-  byte for byte with the saved detections (nms050 is dropped if either differs), run `replay.secondbox --dets` on both
-  clips and diff the baseline step's tracks against the saved ones. Then fill in the Results tables, the winner or a
-  negative result, and the per-enter account, in the wording the Fix section allows.
+  finds still found, fewer than 9 extra enters, no harm on MTID). It was committed before any step ran.
+- Done: the steps, in the edge image (Ultralytics 8.4.170, CPU, no build, no download), the last block of the study's
+  Reproduce. Both 0.7 re-dumps are byte-identical to the saved detections, so nms050 is computed; the baseline step's
+  tracks equal the saved ones once sorted, and its rows print the declared baseline again. One enter commits a frame
+  apart from the saved file (track 24, frame 811 in memory against 810), as the design allows; no count changes.
+- Outcome, by the declared rule: contain090_same wins, measured in the replay harness only. It drops a detection with
+  0.9 or more of its own area inside a strictly higher-scoring detection of the same detector class, in front of
+  ByteTrack. Five steps qualify; contain080 and contain090 do not, since they lose car 25, and contain080 car 50 too.
+  contain080_same, contain090_same and nms050 tie at 2 extra enters on MVI_40714, against the baseline's 9;
+  contain090_same loses the fewest vehicle-frames (76 on MVI_40714 plus 8 on MTID, against 134 for nms050 and 146 for
+  contain080_same). Per enter, on this one 47.2 s clip: it removes 6 of the 8 second-box enters (duplicates 453, 543
+  and 592; parts 550, 726 and 750) and adds none; duplicates 9 and 749 stay (a duplicate on bus 27 at 280 ms and one on
+  bus 30 at 41760 ms in its run); it keeps the 26 vehicles the baseline found and does not find car 34. On MTID it does
+  no harm by the rule's checks: 20 of 21 annotated visits found, 16 judged extra enters, 14 of 14 labels matched.
+  nms050 removes 7 of the 8 but adds an enter on a vehicle with no truth visit; the birth steps remove 2 and 3.
+- Shipping the winner would take a step between detection and tracking in the edge service, which `model.track()` in
+  `services/edge/src/main.py` does not offer: the edge would run detection, the containment filter and the tracker as
+  separate steps. None of that is built or measured; the result holds for the replay harness on saved detections.
+- Open, for the owner to choose; none is recommended here: build that edge path and run the live edge on a clip; close
+  task C on the replay result; or try the step on another annotated clip, since the result is one clip, one detector
+  and one tracker. Left by the winner: duplicates 9 and 749 (nms050 alone removes both). Left by every step: car 34
+  missed, and under the zone rule car 11.
 - The candidate straddle fix stays written down: drop a box mostly covered by two higher-scoring boxes, and check it
   keeps a car seen in the gap between two nearer ones; track 451 shows a straddle with fewer than two boxes around it,
   which that rule would not catch.
