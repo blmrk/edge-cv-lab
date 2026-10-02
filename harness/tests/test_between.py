@@ -1,3 +1,6 @@
+import json
+import sys
+
 import pytest
 
 from replay import between
@@ -63,3 +66,29 @@ def test_a_track_box_overlapping_no_detection_stands_for_none_even_when_its_fram
         tracks.append(TrackBox(f, f * 100, 9, (330, 300 + dy, 390, 380 + dy), 0.9, "car"))  # beside them, touching none
     [row] = between.enters_table(dets, tracks, band)
     assert (row["track_id"], row["boxes"], row["bridge_boxes"]) == (9, 60, 0)
+
+
+@pytest.mark.parametrize("bridged, frames, half_or_more", [
+    (50, 101, 0),  # 50 of 101 boxes: 0.495, shown rounded as 0.5, is under half
+    (30, 60, 1),   # 30 of 60 boxes: exactly half counts
+])
+def test_main_counts_share_half_or_more_on_the_exact_share_not_the_rounded_one(bridged, frames, half_or_more,
+                                                                               tmp_path, monkeypatch, capsys):
+    band = [(0, 290), (400, 290), (400, 400), (0, 400)]
+    rows = []
+    for f in range(frames):  # the box across is a bridge box only while both cars outscore it
+        dy = 3 * f - 100
+        for (x1, y1, x2, y2), s, tid in ((LEFT, 0.9, 1), (RIGHT, 0.8, 2), (STRADDLE, 0.2 if f < bridged else 0.95, 3)):
+            rows.append({"frame": f, "ts_ms": f * 100, "bbox": [x1, y1 + dy, x2, y2 + dy], "score": s, "cls": "car",
+                         "track_id": tid})
+    for name, body in (("dets.jsonl", "".join(json.dumps(r) + "\n" for r in rows)),
+                       ("zone.json", json.dumps({"polygon": band}))):
+        (tmp_path / name).write_text(body)
+    monkeypatch.setattr(sys, "argv", ["between.py", "--dets", str(tmp_path / "dets.jsonl"),
+                                      "--tracks", str(tmp_path / "dets.jsonl"), "--zone", str(tmp_path / "zone.json")])
+
+    between.main()
+
+    out = capsys.readouterr().out
+    assert f"| 3 | {frames} | {bridged} | 0.5 |" in out
+    assert f"enters 3 | with any bridge box 1 | half or more {half_or_more}" in out

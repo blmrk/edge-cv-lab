@@ -76,7 +76,8 @@ def enter_flags(dets, tracks, poly, flag, min_iou: float = 0, **counter_kw) -> l
 
 def enters_table(dets, tracks, poly, **counter_kw) -> list[dict]:
     """One row per debounced enter, in time order: how many of its track's boxes are bridge boxes (see enter_flags for
-    how a track box maps to a detection). counter_kw goes to DebouncedZoneCounter."""
+    how a track box maps to a detection). bridge_share is rounded for display; cut on bridge_boxes / boxes. counter_kw
+    goes to DebouncedZoneCounter."""
     rows = []
     for n, (e, tb, flags) in enumerate(enter_flags(dets, tracks, poly, lambda d, ds: bridge(d, ds) is not None,
                                                    **counter_kw)):
@@ -137,7 +138,7 @@ def main() -> None:
           + (f", median score {flagged[len(flagged) // 2]}" if flagged else ""))
     rows = enters_table(dets, tracks, poly, min_travel_px=a.min_travel_px)
     print(f"enters {len(rows)} | with any bridge box {sum(r['bridge_boxes'] > 0 for r in rows)} | "
-          f"half or more {sum(r['bridge_share'] >= 0.5 for r in rows)}\n")
+          f"half or more {sum(2 * r['bridge_boxes'] >= r['boxes'] for r in rows)}\n")  # unrounded
     cols = ["enter", "ts_ms", "track_id", "boxes", "bridge_boxes", "bridge_share", "score"]
     print("| " + " | ".join(c.replace("_", " ") for c in cols) + " |")
     print("|" + "---|" * len(cols))
