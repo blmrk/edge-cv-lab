@@ -14,8 +14,11 @@ theirs in x. An enter is put down to a straddle when its track's box in the ente
 stands for the detection it overlaps most in its frame, and only if they overlap at IoU above 0.5. Tracks are built from
 every detection, masked ones included, so a box whose own detection was masked must not stand for a neighbour.
 What it cannot tell apart: a vehicle the annotators missed, seen in the gap between two annotated ones, is a straddle
-here, just as it is a bridge box to replay.between. And it undercounts: a box across one annotated vehicle and one in an
-ignored region, or across two vehicles one behind the other, is unmatched but not a straddle.
+here, just as it is a bridge box to replay.between. Nor does a straddle have to lie across two separate vehicles: 0.2 of
+its area on each annotated box is enough, so a box mostly on one vehicle passes, and the pair test does not stop one
+annotated box lying mostly inside the other (a car in front of a bus), so a box on that car alone can pass as one across
+both. And it undercounts: a box across one annotated vehicle and one in an ignored region, or across two vehicles one
+behind the other in the road, one box higher in the frame than the other, is unmatched but not a straddle.
 """
 from __future__ import annotations
 
@@ -74,7 +77,8 @@ def summary(dets, gt) -> dict:
 def enters_table(dets, tracks, gt, poly, **counter_kw) -> list[dict]:
     """One row per debounced enter, in time order: how many of its track's boxes are straddles, and whether the box it
     entered with is one. A track box stands for a detection only at IoU above 0.5 (see the module docstring).
-    dets: already masked. counter_kw goes to DebouncedZoneCounter."""
+    straddle_share is rounded for display; cut on straddle_boxes / boxes. dets: already masked. counter_kw goes to
+    DebouncedZoneCounter."""
     flagged = {d for v in straddles(dets, gt).values() for d, *_ in v}
     rows = []
     for n, (e, tb, flags) in enumerate(enter_flags(dets, tracks, poly, lambda d, _: d in flagged, min_iou=0.5,
@@ -109,7 +113,7 @@ def main() -> None:
     poly = [tuple(p) for p in json.load(open(a.zone))["polygon"]]
     rows = enters_table(dets, list(read_tracks(a.tracks)), gt, poly, min_travel_px=a.min_travel_px)
     print(f"\nenters {len(rows)} | straddle at enter {sum(r['straddle_at_enter'] for r in rows)} | "
-          f"straddle share 0.5 or more {sum(r['straddle_share'] >= 0.5 for r in rows)}\n")
+          f"straddle share 0.5 or more {sum(2 * r['straddle_boxes'] >= r['boxes'] for r in rows)}\n")  # unrounded
     cols = ["enter", "ts_ms", "frame", "track_id", "boxes", "straddle_boxes", "straddle_share", "straddle_at_enter"]
     print("| " + " | ".join(c.replace("_", " ") for c in cols) + " |")
     print("|" + "---|" * len(cols))

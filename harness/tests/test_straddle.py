@@ -52,11 +52,11 @@ def test_summary_counts_detections_unmatched_straddles_and_frames():
                                           "straddle_frame_share": 0.3333}
 
 
-def _drive(right_annotated=range(60)):
+def _drive(right_annotated=range(60), frames=60):
     """Two cars and a box across them drive down into BAND, tracks 1, 2 and 3; the right car is annotated only in
     right_annotated frames, so the box across is a straddle only there."""
     dets, tracks, gt = [], [], []
-    for f in range(60):
+    for f in range(frames):
         dy = 3 * f - 100
         for tid, (x1, y1, x2, y2) in ((3, ACROSS), (1, LEFT), (2, RIGHT)):  # the box across first in each frame
             b = (x1, y1 + dy, x2, y2 + dy)
@@ -81,6 +81,16 @@ def test_straddle_at_enter_looks_at_the_enter_frame_alone(annotated, at_enter):
     assert (row["straddle_boxes"], row["straddle_share"], row["straddle_at_enter"]) == (30, 0.5, at_enter)
 
 
+@pytest.mark.parametrize("annotated, at_enter", [
+    (range(9, 13), False),  # straddles on the first four frames of the enter streak, none on the commit frame
+    (range(13, 14), True),  # a straddle on the commit frame alone
+])
+def test_straddle_at_enter_reads_the_commit_frame_not_the_streak(annotated, at_enter):
+    row = next(r for r in straddle.enters_table(*_drive(annotated), BAND) if r["track_id"] == 3)
+    assert row["frame"] == 13  # footpoint 10 px past the top edge from frame 9: a 5-frame streak, 9 to 13
+    assert (row["straddle_boxes"], row["straddle_at_enter"]) == (len(annotated), at_enter)
+
+
 @pytest.mark.parametrize("why, car", [
     ("overlaps the box across at IoU 0.2, more than any other kept box", (190, 340, 270, 440)),
     ("overlaps no kept box at all, and its frame opens with the box across", (330, 300, 390, 380)),
@@ -96,6 +106,19 @@ def test_a_track_box_whose_own_detection_was_masked_stands_for_no_detection(why,
     rows = {r["track_id"]: r for r in straddle.enters_table(kept, tracks, gt, BAND)}
     assert len(kept) == 180 and (rows[3]["straddle_boxes"], rows[3]["straddle_at_enter"]) == (60, True), why
     assert (rows[4]["boxes"], rows[4]["straddle_boxes"], rows[4]["straddle_at_enter"]) == (60, 0, False), why
+
+
+@pytest.mark.parametrize("why, box, flagged", [
+    ("IoU 0.6 with the box across: shifted 25 px left, as a tracker's smoothed box is", (135, 305, 235, 375), True),
+    ("IoU 0.5 exactly: the middle half of the box across, and the rule is above 0.5", (185, 305, 235, 375), False),
+    ("IoU 0.51: the middle 51 px of the box across, just above the rule", (184, 305, 235, 375), True),
+])
+def test_a_track_box_stands_for_the_detection_it_overlaps_only_above_iou_0_5(why, box, flagged):
+    dets, tracks, gt = _drive()
+    tracks = [TrackBox(t.frame, t.ts_ms, 3, (box[0], box[1] + 3 * t.frame - 100, box[2], box[3] + 3 * t.frame - 100),
+                       t.score, t.cls) if t.track_id == 3 else t for t in tracks]
+    row = next(r for r in straddle.enters_table(dets, tracks, gt, BAND) if r["track_id"] == 3)
+    assert (row["straddle_boxes"], row["straddle_at_enter"]) == ((60, True) if flagged else (0, False)), why
 
 
 def _files(tmp_path, dets, tracks, gt):
@@ -129,6 +152,21 @@ def test_main_masks_then_prints_the_summary_the_enters_with_a_straddle_and_the_t
     assert "enters 3 | straddle at enter 1 | straddle share 0.5 or more 1" in out
     table = [line for line in out.splitlines() if line.startswith("| ") and not line.startswith("| enter")]
     assert len(table) == 1 and table[0].endswith("| 3 | 60 | 60 | 1.0 | True |")  # only the enter with a straddle
+
+
+@pytest.mark.parametrize("annotated, frames, half_or_more", [
+    (range(50), 101, 0),  # 50 of 101 boxes: 0.495, shown rounded as 0.5, is under half
+    (range(30), 60, 1),   # 30 of 60 boxes: exactly half counts
+])
+def test_main_counts_share_half_or_more_on_the_exact_share_not_the_rounded_one(annotated, frames, half_or_more,
+                                                                               tmp_path, monkeypatch, capsys):
+    files = _files(tmp_path, *_drive(annotated, frames=frames))
+
+    _main(monkeypatch, files, "dets", "gt", "ignored", "tracks", "zone")
+
+    out = capsys.readouterr().out
+    assert f"| 3 | {frames} | {len(annotated)} | 0.5 | True |" in out
+    assert f"straddle share 0.5 or more {half_or_more}" in out
 
 
 def test_main_without_tracks_prints_the_summary_alone_and_tracks_need_a_zone(tmp_path, monkeypatch, capsys):
