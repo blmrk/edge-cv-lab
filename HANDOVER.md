@@ -6,7 +6,7 @@ Last updated 2026-10-02. Everything below has been run unless marked otherwise.
 
 | Piece | State |
 |---|---|
-| Replay harness, 156 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 233 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
@@ -17,6 +17,7 @@ Last updated 2026-10-02. Everything below has been run unless marked otherwise.
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
+| `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run on the host on the saved baseline files of MVI_40714 and MTID only (`--tracks`, baseline labels), for the declared design in `docs/case-study-straddles.md`; `--dets` and the `--iou` dumps **not yet run** |
 
 ## Case studies
 
@@ -28,12 +29,12 @@ kind has a follow-up study of its own (task C):
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is found and counted, not fixed (task C) |
-| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | baseline measured, no fix: `docs/case-study-straddles.md` (task C, next step open) |
+| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | baseline measured; the fix moved to second boxes, its design declared, its steps not run: `docs/case-study-straddles.md` (task C) |
 | Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
 
-### C. A fix for boxes straddling two side-by-side vehicles
+### C. A fix for second boxes: one vehicle counted on two tracks (follow-up to boxes straddling two vehicles)
 - Found on a dense expressway clip (`media/vecteezy-6434705.mp4`, metrics only): 2 of 52 zone enters sit on a box across
   two vehicles, by three visual passes. The zone rule keeps both; a birth score of 0.5 removes one and 9 other enters
   whose truth is unknown. `replay.between` flags candidates but misses track 451: in 130 of its 158 frames fewer than two
@@ -64,11 +65,20 @@ kind has a follow-up study of its own (task C):
   not measured. Track 750 is born on a box the rule calls a straddle, scoring 0.38, above the birth score, and the
   bridge test does not flag the box it enters with. The zone rule cannot be scored by time on this clip (it restamps
   the vehicles standing at the start); the study scores it by vehicle instead.
-- Open, for the owner to choose; none is recommended here:
-  - close task C as a measured negative on this clip: no enter sits on a box across two separate vehicles;
-  - move the fix to the second-box failure behind 8 of the 9 extra enters here;
-  - look for another annotated clip where boxes across two separate vehicles reach the counter.
-  The candidate straddle fix stays written down: drop a box mostly covered by two higher-scoring boxes, and check it
+- Decision taken: the fix moved to the second-box failure behind 8 of the 9 extra enters (5 a second track on a vehicle
+  already tracked, 3 a box on part of one). The straddle candidate is not pursued on this clip; closing C as a negative
+  and looking for another clip were not taken. The design is declared in the study's Fix section, before any step runs:
+  per-detection labels and enters put down by vehicle (`replay.secondbox`); seven steps, each one change against the
+  ByteTrack baseline (a box 0.8 or 0.9 of its own area inside a higher-scoring box dropped, with and without the same
+  class; track birth score 0.4 and 0.5; NMS IoU 0.5 instead of 0.7); and a winner rule (all 26 vehicles the baseline
+  finds still found, fewer than 9 extra enters, no harm on MTID). The baseline figures it quotes are measured on the
+  saved files on the host (the study's Reproduce); the Results tables are TBD.
+- Next: commit the declared design, then run the steps in the edge image, the commands marked not run yet at the end
+  of the study's Reproduce (no build, no download): dump both clips again at NMS IoU 0.7 and 0.5, compare the 0.7 dumps
+  byte for byte with the saved detections (nms050 is dropped if either differs), run `replay.secondbox --dets` on both
+  clips and diff the baseline step's tracks against the saved ones. Then fill in the Results tables, the winner or a
+  negative result, and the per-enter account, in the wording the Fix section allows.
+- The candidate straddle fix stays written down: drop a box mostly covered by two higher-scoring boxes, and check it
   keeps a car seen in the gap between two nearer ones; track 451 shows a straddle with fewer than two boxes around it,
   which that rule would not catch.
 
