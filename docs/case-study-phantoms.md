@@ -163,7 +163,9 @@ least half of its own boxes on it, so the track of a vehicle under the straddle 
 rule cannot see them, since they move with traffic; the size floor and the static mask are built for small or static
 boxes, and these are neither. The birth score 0.5 removes the weaker one and 9 other enters, which may be missed
 vehicles or double counts: with no visit labels, this clip cannot say. A fix for this kind (for example, dropping a box
-mostly covered by two higher-scoring boxes) needs a dense clip with visit labels to be measured; it is left open.
+mostly covered by two higher-scoring boxes) needs a dense clip with visit labels to be measured; it is left open. A
+follow-up study measures this kind against annotated boxes and visits on another clip: [boxes straddling two
+vehicles](case-study-straddles.md).
 
 ## Limitations
 
