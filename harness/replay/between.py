@@ -31,13 +31,14 @@ def _area(b) -> float:
     return (b[2] - b[0]) * (b[3] - b[1])
 
 
-def bridge(box, frame_dets, touch: float = 0.2):
-    """The two detections `box` bridges, or None. frame_dets: every detection in its frame (box itself may be one)."""
+def bridge(box, frame_dets, touch: float = 0.2, outscored: bool = True):
+    """The two detections `box` bridges, or None. frame_dets: every detection in its frame (box itself may be one).
+    outscored=False drops the score test, for neighbours with no real score: annotated boxes (replay.straddle)."""
     b = box.bbox
     if _area(b) <= 0:
         return None
-    near = [d for d in frame_dets
-            if d.score > box.score and _inter(b, d.bbox) >= touch * _area(b) and iou(b, d.bbox) < 0.5]
+    near = [d for d in frame_dets if (not outscored or d.score > box.score)
+            and _inter(b, d.bbox) >= touch * _area(b) and iou(b, d.bbox) < 0.5]
     cx = (b[0] + b[2]) / 2
     for i, p in enumerate(near):
         for q in near[i + 1:]:
@@ -50,9 +51,11 @@ def bridge(box, frame_dets, touch: float = 0.2):
     return None
 
 
-def enters_table(dets, tracks, poly, **counter_kw) -> list[dict]:
-    """One row per debounced enter, in time order: how many of its track's boxes are bridge boxes. A track box stands for
-    the detection it overlaps most in its frame. counter_kw goes to DebouncedZoneCounter."""
+def enter_flags(dets, tracks, poly, flag, min_iou: float = 0, **counter_kw) -> list[tuple]:
+    """(enter event, its track's boxes, a flag per box) for every debounced enter, in time order. A track box stands for
+    the detection it overlaps most in its frame, if they overlap at IoU above min_iou (0: at all), and its flag is
+    flag(that detection, every detection in the frame); a box that stands for none is False. counter_kw goes to
+    DebouncedZoneCounter."""
     by_frame, by_id = defaultdict(list), defaultdict(list)
     for d in dets:
         by_frame[d.frame].append(d)
@@ -61,13 +64,23 @@ def enters_table(dets, tracks, poly, **counter_kw) -> list[dict]:
         by_id[t.track_id].append(t)
     enters = sorted((e for e in run(DebouncedZoneCounter(poly, **counter_kw), tracks) if e.kind == "enter"),
                     key=lambda e: (e.ts_ms, e.track_id))
-    rows = []
-    for n, e in enumerate(enters):
-        tb = by_id[e.track_id]
-        flagged = 0
-        for t in tb:
+    out = []
+    for e in enters:
+        flags = []
+        for t in by_id[e.track_id]:
             src = max(by_frame[t.frame], key=lambda d: iou(d.bbox, t.bbox), default=None)
-            flagged += src is not None and bridge(src, by_frame[t.frame]) is not None
+            flags.append(src is not None and iou(src.bbox, t.bbox) > min_iou and flag(src, by_frame[t.frame]))
+        out.append((e, by_id[e.track_id], flags))
+    return out
+
+
+def enters_table(dets, tracks, poly, **counter_kw) -> list[dict]:
+    """One row per debounced enter, in time order: how many of its track's boxes are bridge boxes (see enter_flags for
+    how a track box maps to a detection). counter_kw goes to DebouncedZoneCounter."""
+    rows = []
+    for n, (e, tb, flags) in enumerate(enter_flags(dets, tracks, poly, lambda d, ds: bridge(d, ds) is not None,
+                                                   **counter_kw)):
+        flagged = sum(flags)
         rows.append({"enter": n, "ts_ms": e.ts_ms, "frame": e.frame, "track_id": e.track_id, "boxes": len(tb),
                      "bridge_boxes": flagged, "bridge_share": round(flagged / len(tb), 2),
                      "score": round(sum(t.score for t in tb) / len(tb), 3)})

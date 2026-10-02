@@ -34,6 +34,11 @@ def test_a_bridge_box_must_score_below_both_vehicles():
     assert not between.bridge(dets[2], dets)
 
 
+def test_outscored_false_drops_the_score_test():
+    dets = _frame((LEFT, 0.9), (RIGHT, 0.3), (STRADDLE, 0.5))  # RIGHT scores below the box: no bridge by default
+    assert between.bridge(dets[2], dets, outscored=False) == (dets[0], dets[1])
+
+
 def test_enters_table_gives_each_enter_the_share_of_its_boxes_that_are_bridge_boxes():
     band = [(0, 290), (400, 290), (400, 400), (0, 400)]
     dets, tracks = [], []
@@ -46,3 +51,15 @@ def test_enters_table_gives_each_enter_the_share_of_its_boxes_that_are_bridge_bo
             tracks.append(TrackBox(f, f * 100, tid, b, s, "car"))
     rows = {r["track_id"]: r for r in between.enters_table(dets, tracks, band)}
     assert (rows[1]["bridge_share"], rows[2]["bridge_share"], rows[3]["bridge_share"]) == (0.0, 0.0, 1.0)
+
+
+def test_a_track_box_overlapping_no_detection_stands_for_none_even_when_its_frame_opens_with_a_bridge_box():
+    band = [(0, 290), (400, 290), (400, 400), (0, 400)]
+    dets, tracks = [], []
+    for f in range(60):
+        dy = 3 * f - 100
+        for (x1, y1, x2, y2), s in ((STRADDLE, 0.2), (LEFT, 0.9), (RIGHT, 0.8)):  # the bridge box first in the frame
+            dets.append(Detection(f, f * 100, (x1, y1 + dy, x2, y2 + dy), s, "car"))
+        tracks.append(TrackBox(f, f * 100, 9, (330, 300 + dy, 390, 380 + dy), 0.9, "car"))  # beside them, touching none
+    [row] = between.enters_table(dets, tracks, band)
+    assert (row["track_id"], row["boxes"], row["bridge_boxes"]) == (9, 60, 0)
