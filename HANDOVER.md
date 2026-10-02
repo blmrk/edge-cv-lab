@@ -1,12 +1,12 @@
 # Handover
 
-Last updated 2026-10-01. Everything below has been run unless marked otherwise.
+Last updated 2026-10-02. Everything below has been run unless marked otherwise.
 
 ## Status
 
 | Piece | State |
 |---|---|
-| Replay harness, 129 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 156 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
@@ -15,17 +15,20 @@ Last updated 2026-10-01. Everything below has been run unless marked otherwise.
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
 | Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
-| `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth not yet run on it |
+| `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
+| `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
 
 ## Case studies
 
-The repo's story is four field failures, each written up as its own case study under `docs/`:
+The repo's story is four field failures, each written up as its own case study under `docs/`; the phantom boxes' second
+kind has a follow-up study of its own (task C):
 
 | Case study | Question | State |
 |---|---|---|
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is found and counted, not fixed (task C) |
+| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | baseline measured, no fix: `docs/case-study-straddles.md` (task C, next step open) |
 | Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
@@ -36,14 +39,38 @@ The repo's story is four field failures, each written up as its own case study u
   whose truth is unknown. `replay.between` flags candidates but misses track 451: in 130 of its 158 frames fewer than two
   other boxes cover a fifth of it without matching it, so there is no pair to bridge.
 - Clip chosen: UA-DETRAC test sequence MVI_40714 (`media/UA-DETRAC/`, metrics only, logged in `media/SOURCES.md`). Fixed
-  elevated view, the near-left carriageway queued several abreast. Its annotated boxes with track IDs give both kinds
-  of truth without hand labels: a straddle is a detection that matches no annotated box but lies across two, and
-  visits come from `detrac_to_gt.py --zone`. The mp4 is frame-aligned with the XML (checked, `docs/datasets.md`).
-  Next: a zone on the queued carriageway, clear of the ignored regions; a straddle scorer (reuse `between.bridge`
-  geometry on the annotated boxes, and mask detections in the ignored regions too); the baseline; then a fix.
-- Candidate fix: drop a box mostly
-  covered by two higher-scoring boxes, and check it keeps a car seen in the gap between two nearer ones; track 451 shows
-  a straddle with fewer than two boxes around it, which that rule would not catch.
+  elevated view, the near-left carriageway queued several abreast. Its annotated boxes with track IDs give, without
+  hand labels, visit truth from the annotated tracks (`detrac_to_gt.py --zone`) and straddles by a fixed rule on the
+  annotated boxes (`replay.straddle`): a detection that matches no annotated box but lies across two. The rule
+  overcounts as well as undercounts (the study's Limitations). The mp4 is frame-aligned with the XML (checked,
+  `docs/datasets.md`).
+- Done: the zone on the queued carriageway, clear of the ignored regions, chosen from the frames and the annotations
+  only, without reading any detector output (`runs/MVI_40714.zone.json`, written in the study's Reproduce); visit truth
+  from `detrac_to_gt.py --zone` (27 visits, 11 of them vehicles standing in the zone at the first frame); the straddle
+  scorer `replay.straddle`; the baseline, `docs/case-study-straddles.md`. ByteTrack with the debounced counter: 35
+  enters for 27 visits (26 matched, 9 false, 1 missed). Straddle at enter, by the scorer's rule: 1 of 35 (track 750),
+  straddle share 0.5 or more: none; the same with the zone rule (1 of 30). That one enter is a second box on part of
+  car 25, whose annotated box lies mostly inside bus 30's, so on this clip no enter sits on a box across two separate
+  vehicles. 568 of the 35151 kept detections are straddles by the rule, 0.91 of them under ByteTrack's birth score of
+  0.25. Looked at after the results, with the rule kept as fixed: 218 of the 568 put 0.2 of their area on each
+  annotated box outside the other, the geometry of a box across two separate vehicles, though what they are has not
+  been checked; 461 lie across one pair of buses that no ByteTrack box stands for, 182 of the 218 among them.
+- What the baseline says: by vehicle alone, 8 of the 9 extra enters are a second box on one vehicle (5 a second track
+  on a vehicle already tracked, 3 a box on part of one vehicle, track 750 among them) and none is a box across two
+  vehicles. A straddle fix could remove track 750's enter; anything else it changes in the count comes from boxes it
+  should not drop, so it would be judged per detection first: straddles it drops against annotated vehicles it leaves
+  with no detection. `between.bridge`, the closest existing rule, flags 247 of the 568 straddles (233 on that pair of
+  buses) and also 114 boxes that match an annotated vehicle; how many of those vehicles it would leave undetected is
+  not measured. Track 750 is born on a box the rule calls a straddle, scoring 0.38, above the birth score, and the
+  bridge test does not flag the box it enters with. The zone rule cannot be scored by time on this clip (it restamps
+  the vehicles standing at the start); the study scores it by vehicle instead.
+- Open, for the owner to choose; none is recommended here:
+  - close task C as a measured negative on this clip: no enter sits on a box across two separate vehicles;
+  - move the fix to the second-box failure behind 8 of the 9 extra enters here;
+  - look for another annotated clip where boxes across two separate vehicles reach the counter.
+  The candidate straddle fix stays written down: drop a box mostly covered by two higher-scoring boxes, and check it
+  keeps a car seen in the gap between two nearer ones; track 451 shows a straddle with fewer than two boxes around it,
+  which that rule would not catch.
 
 ### Deferred
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.
@@ -76,6 +103,10 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
   on a quiet camera a lost visit stays open until then.
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
   on 2026-09-28; the image installs `ultralytics>=8.3` unpinned, so a rebuild can bring a release with another signature.
+- The edge image now reports Ultralytics 8.4.170 (`docker run --rm edge-cv-lab-edge python -c "import ultralytics;
+  print(ultralytics.__version__)"`), the version `docs/case-study-straddles.md` records. The phantom study's figures
+  were measured on the version its doc names; the counting and balance studies' docs (`docs/case-study-tracking.md`,
+  `docs/case-study-balance.md`) name none. None of them has been re-run.
 - ByteTrack fails the queue fixture at its defaults (1 of 6 visits, 5 ID transfers): the phantom study's stopped-car
   check runs on `groundplane` for that reason.
 - `DebouncedZoneCounter.min_travel_px` defaults to 0; the edge and the sim run without it. Its trade-off: a vehicle
