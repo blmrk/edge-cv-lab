@@ -9,8 +9,8 @@ webcam indexes are numbered in read order at their own fps.
 Image frames are numbered from the file name (img00001.jpg -> frame 0), not by read order, so a frame
 that fails to load leaves a gap instead of shifting every later frame against the ground truth.
 conf defaults to 0.1 on purpose: ByteTrack-style trackers use low-score boxes to ride through occlusion.
-NMS is class-agnostic: a car box and a truck box overlapping above IoU 0.7 (Ultralytics' default iou) keep only the
-higher-scoring one, instead of both reaching the tracker as two vehicles.
+NMS is class-agnostic: a car box and a truck box overlapping above --iou (0.7 by default, Ultralytics' own default) keep
+only the higher-scoring one, instead of both reaching the tracker as two vehicles. --iou is always passed to predict().
 """
 import argparse
 import json
@@ -31,6 +31,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--model", default="yolov8n.pt")
     ap.add_argument("--conf", type=float, default=0.1)
+    ap.add_argument("--iou", type=float, default=0.7, help="NMS IoU threshold (Ultralytics' default 0.7)")
     ap.add_argument("--classes", type=int, nargs="*", default=[2, 5, 7])  # COCO car, bus, truck
     ap.add_argument("--per-class-nms", action="store_true",
                     help="NMS within each class only, which keeps a car box and a truck box on one vehicle "
@@ -47,7 +48,7 @@ def main():
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     prev = None
     with open(a.out, "w") as fh:
-        results = model.predict(a.video, conf=a.conf, classes=a.classes, agnostic_nms=not a.per_class_nms,
+        results = model.predict(a.video, conf=a.conf, iou=a.iou, classes=a.classes, agnostic_nms=not a.per_class_nms,
                                 stream=True, verbose=False)
         for i, r in enumerate(results):
             frame = frame_from_filename(r.path) if is_image(r.path) else i  # videos and streams: read order

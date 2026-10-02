@@ -104,6 +104,15 @@ def test_nms_is_class_agnostic_unless_per_class_is_asked_for(monkeypatch, tmp_pa
     assert [c.get("agnostic_nms") for c in calls] == [True, False]
 
 
+def test_nms_iou_defaults_to_0_7_and_reaches_predict(monkeypatch, tmp_path):
+    # Ultralytics' own default is 0.7; passing it always means a re-dump at 0.7 runs the same NMS as the saved files
+    (tmp_path / "clip.mp4").write_bytes(b"")
+    calls = []
+    run(monkeypatch, tmp_path, tmp_path / "clip.mp4", [], calls=calls)
+    run(monkeypatch, tmp_path, tmp_path / "clip.mp4", [], calls=calls, extra=["--iou", "0.5"])
+    assert [c.get("iou") for c in calls] == [0.7, 0.5]
+
+
 def test_dump_tracks_nms_is_class_agnostic_unless_per_class_is_asked_for(monkeypatch, tmp_path):
     calls = []
     model = types.SimpleNamespace(names={2: "car"}, track=lambda *_, **kw: calls.append(kw) or iter(()))
