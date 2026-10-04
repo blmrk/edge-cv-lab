@@ -143,9 +143,10 @@ make broker-restart           # fresh lab, ~5 min: ingest away across a broker r
 | Next car inherits the previous car's ID, merging visits | IoU association plus a track left parked where a vehicle vanished | Ground-contact association with a lane-shaped gate and damped coasting | `queue.dets.jsonl` |
 | Zone occupancy never returns to zero, and a live "in zone" sum never shows a vehicle inside | Visits whose track is lost are never closed; the debounced counter holds each enter until its visit closes | Close a visit 3 s after its track goes silent (`lost_ms`, on by default); read occupancy as a gauge of visits seen in the last 500 ms, with the zone rule (opt-in: `OCCUPANCY_GAUGE_MS=500`, `MIN_TRAVEL_PX=30`) | real clip, `replay.balance`; [docs/case-study-balance.md](docs/case-study-balance.md) |
 | Lane marking inside the zone counted as a visit | Detector scores it as a car at low confidence; ByteTrack keeps low-score boxes | Zone rule: a track must move `min_travel_px` before it can enter (off by default) | real clip, `replay.phantoms`; `test_zones.py` |
+| One vehicle counted twice | A second detection on it (a duplicate, or a box on part of a bus) starts a second track | Drop a detection mostly inside a higher-scoring one of the same class, before tracking (replay harness only, not in the edge service) | annotated clip, `replay.secondbox`; [docs/case-study-straddles.md](docs/case-study-straddles.md) |
 | "Online" device that is actually dead | Health inferred from network reachability | App-level heartbeat with FPS, plus MQTT last-will | lab |
 
-Roadmap: published trackers (FastTracker, UCMCTrack, TrackTrack) on real footage through the MOT bridge, scored with TrackEval; a fix for boxes straddling two side-by-side vehicles (found and counted in [docs/case-study-phantoms.md](docs/case-study-phantoms.md), not fixed), broker drain test on kind + EMQX Operator.
+Roadmap: published trackers (FastTracker, UCMCTrack, TrackTrack) on real footage through the MOT bridge, scored with TrackEval; the second-box filter in the edge service (measured in the replay harness in [docs/case-study-straddles.md](docs/case-study-straddles.md), not shipped), broker drain test on kind + EMQX Operator.
 
 ## Design notes
 
