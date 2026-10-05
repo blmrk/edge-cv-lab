@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Phantom boxes: each fix against the same ByteTrack baseline, one row each, so every fix is measured on its own.
 
 docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge python -m replay.phantoms \

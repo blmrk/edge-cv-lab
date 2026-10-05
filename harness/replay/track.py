@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """python -m replay.track --dets runs/dets.jsonl --tracker groundplane --out runs/groundplane.jsonl
 Tracker parameters: --param gate_along=150 --param max_age=60"""
 from __future__ import annotations

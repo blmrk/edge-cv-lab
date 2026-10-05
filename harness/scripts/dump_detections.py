@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Video -> detections JSONL (no IDs). Run the detector once, then compare any number of trackers.
 Needs: pip install -e '.[video]'
 

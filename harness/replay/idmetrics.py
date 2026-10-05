@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Small identity metrics against ground-truth tracks. For publishable numbers use TrackEval
 (HOTA, IDF1) via `replay.motformat export-tracks`; these exist so failure modes are unit-testable.
 

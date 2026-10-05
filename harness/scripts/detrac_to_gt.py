@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """UA-DETRAC XML annotations -> harness ground truth.
 
 python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/DETRAC-Train-Annotations-XML/MVI_20011.xml --out runs/MVI_20011 [--zone zone.json]

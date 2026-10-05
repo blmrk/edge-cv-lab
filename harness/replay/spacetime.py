@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Space-time diagram: position along the lane vs time, coloured by predicted track ID.
 An identity handover shows up as one colour continuing onto the next vehicle's line.
 

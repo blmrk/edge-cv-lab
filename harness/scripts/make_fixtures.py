@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Deterministic synthetic tracks that reproduce known failure modes. Run from harness/."""
 import json
 import random

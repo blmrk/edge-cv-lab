@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Video -> tracks JSONL using Ultralytics' built-in trackers. Needs: pip install -e '.[video]'
 
 python scripts/dump_tracks.py --video ../media/sample.mp4 --tracker bytetrack.yaml --out runs/bytetrack.jsonl

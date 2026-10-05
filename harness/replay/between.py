@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Boxes between two vehicles side by side: does a box across the gap become a counted visit?
 
 python -m replay.between --dets runs/gap.dets.jsonl --tracks runs/gap.bytetrack.jsonl --zone runs/gap.zone.json

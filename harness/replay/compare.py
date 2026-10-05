@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Run several trackers on the same detections and print one comparison table (Markdown).
 
 python -m replay.compare --dets fixtures/queue.dets.jsonl --zone fixtures/zone.json \

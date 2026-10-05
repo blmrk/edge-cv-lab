@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Exactly-once check for the sim: what the running lab stored vs what each seeded scene must produce."""
 from __future__ import annotations
 

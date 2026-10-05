@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Did every sim event reach Postgres exactly once, and how late? Needs the lab running (`make up`).
 
 Every finished scene is compared with an offline replay of the same seed. A scene has finished when its

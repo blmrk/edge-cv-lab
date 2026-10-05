@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Footpoint tracker: associate on where objects touch the ground, not on box overlap.
 
 A small teaching implementation of three published ideas. It is NOT a reimplementation of either paper:

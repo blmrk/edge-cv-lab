@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Straddles against annotations: detections across two annotated vehicles side by side, and the visits they make.
 
 python -m replay.straddle --dets runs/clip.dets.jsonl --gt runs/clip.gt.jsonl --ignored runs/clip.ignored.json

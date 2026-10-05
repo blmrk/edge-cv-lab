@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Second boxes: one vehicle counted twice because a second detection on it starts a second track, and the steps that
 try to stop it, each against the same ByteTrack baseline.
 

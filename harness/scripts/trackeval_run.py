@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """HOTA, IDF1 and ID switches from TrackEval for replay tracks against ground-truth tracks (e.g. mtid_to_gt.py output).
 
 TrackEval is not a dependency. Clone it once, at the pinned commit (MIT licence); it needs numpy and scipy:

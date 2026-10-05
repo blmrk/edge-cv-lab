@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Bridge to any tracker that speaks MOTChallenge text files, which is nearly every research repo.
 
   1. python -m replay.motformat export-dets --dets runs/dets.jsonl --out seq/det/det.txt

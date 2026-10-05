@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Track record schema. One JSON object per line (JSONL), one line per box per frame.
 
 {"frame": 12, "ts_ms": 400, "track_id": 3, "bbox": [x1, y1, x2, y2], "score": 0.91, "cls": "car"}

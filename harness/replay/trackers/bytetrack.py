@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """ByteTrack as Ultralytics runs it inside model.track() (its BYTETracker, bytetrack.yaml defaults), fed saved
 detections instead of video: detection filters can sit in front of it, and a variant takes seconds, not a video run.
 Needs ultralytics (pip install -e '.[video]', or run it in the edge image); written against BYTETracker(args).

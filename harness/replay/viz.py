@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Visuals from a tracks JSONL. Works with no video at all (draws a schematic road),
 or over a real frame with --video.
 

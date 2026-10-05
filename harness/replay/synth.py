@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Seeded synthetic traffic. Used for fixtures, visuals and the no-video simulator.
 
 Scene (1280x720): lane A runs through the zone, lane B runs just below it. Vehicles in lane A

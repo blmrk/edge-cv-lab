@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """dump_detections.main() with ultralytics and cv2 stubbed, so frame numbering and --fps rules run in CI."""
 import importlib.util
 import json

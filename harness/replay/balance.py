@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Zone balance: do enters and exits reconcile, and what does a standing imbalance say?
 
 python -m replay.balance --tracks runs/bytetrack.agnostic.jsonl --zone zone.json --gt runs/mtid.gt.jsonl [--explain]

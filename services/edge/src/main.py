@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Simulated edge node: RTSP -> detect+track -> zone state machine -> MQTT (QoS 1, persistent session).
 
 The zone logic is imported from the replay harness, so what is tested offline is exactly what runs here. So are the

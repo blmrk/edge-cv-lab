@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Animated tracker comparison: one strip per tracker, same detections, colour = track ID.
 
 Grey shapes are the real vehicles (ground truth), drawn even when the detector cannot see them.

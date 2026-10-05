@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Live occupancy for a device to publish: a DebouncedZoneCounter's committed-inside visits whose track was seen within
 seen_within_ms, sampled at most once per every_ms. Events cannot give this live (docs/case-study-balance.md): the counter
 holds each enter until its visit closes, and learns a track is gone only lost_ms after it was last seen.

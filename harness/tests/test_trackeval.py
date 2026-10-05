@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Ground truth in MOTChallenge format, and scripts/trackeval_run.py against a local TrackEval clone.
 
 The TrackEval tests skip when the clone is absent (CI): it is an external tool, cloned per docs/case-study-tracking.md.

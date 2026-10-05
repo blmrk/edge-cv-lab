@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """services/edge/src/main.py driven on the host: paho, ulid and ultralytics stubbed at the import boundary, numpy
 blocked as in CI ([dev] only), a fake clock, no MQTT or RTSP. Pins what the edge runs and publishes per path."""
 import importlib.util

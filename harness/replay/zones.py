@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Zone entry/exit logic: a naive baseline and a debounced state machine.
 
 The naive counter is the bug. The debounced counter is the fix. Both consume the

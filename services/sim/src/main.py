@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """No-video edge node. Replays seeded synthetic traffic in real time, runs BOTH counters on it,
 and publishes like a real device. Lets the whole lab (broker, chaos, ingest, Grafana) run with
 no footage, no model and no GPU. Each loop uses a new seed, so traffic never repeats exactly.

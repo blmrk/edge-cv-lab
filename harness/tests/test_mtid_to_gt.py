@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """scripts/mtid_to_gt.py on synthetic MTID annotations. The real annotations stay local (media/ is gitignored)."""
 import importlib.util
 import sys

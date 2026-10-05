@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Score counters against hand-labelled ground truth (tools/label.html -> truth.json).
 
 Counts alone can hide errors that cancel out (one missed visit + one double count = "perfect").

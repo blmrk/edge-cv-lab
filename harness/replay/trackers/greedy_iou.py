@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Baseline: greedy IoU association against each track's last box. No motion model.
 
 Deliberately simple. It stands in for the family of image-plane IoU trackers and fails the same

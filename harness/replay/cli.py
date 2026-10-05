@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """python -m replay.cli --tracks fixtures/boundary_jitter.jsonl --zone fixtures/zone.json [--expected 1]"""
 from __future__ import annotations
 

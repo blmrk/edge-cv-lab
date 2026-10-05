@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
 """Adapter for the `boxmot` package (pip install boxmot): ByteTrack, OC-SORT, BoT-SORT and others
 behind one update(dets, img) call. UNTESTED in this repo's CI because boxmot pulls in torch.
 Check the class names against the boxmot version you install; they have been renamed before.
