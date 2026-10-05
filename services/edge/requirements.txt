@@ -1,4 +1,4 @@
-ultralytics>=8.3
+ultralytics==8.4.170  # the version the case studies' figures were measured on; a rebuild must not move them
 lap>=0.5.12  # ByteTrack's assignment solver; without it ultralytics pip-installs it on every start
 opencv-python-headless
 paho-mqtt>=2.0
