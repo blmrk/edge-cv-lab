@@ -166,12 +166,27 @@ More in [docs/architecture.md](docs/architecture.md).
 - The `sim` scene hands the counter perfect track IDs, so it tests zone logic, not tracking. Tracker comparisons run on the queue fixture's raw detections instead.
 - For `make up-video`, tune `mem_limit` for your clip, and pass the clip and its zone: `VIDEO=<file under media/, no spaces> ZONE_POLYGON='[[x,y],...]' make up-video` (defaults: `sample.mp4` and its zone).
 
+## Using this commercially
+
+The code's Apache-2.0 licence allows commercial use on the terms under [Licence](#licence), but third-party components
+keep their own licences, listed with where each was read in [THIRD_PARTY.md](THIRD_PARTY.md). `ultralytics`, which the
+edge service and the optional ByteTrack adapter import, and its `yolov8n.pt` weights are AGPL-3.0, as is the
+`grafana/grafana-oss` image; the replay harness core and the sim and ingest services import no AGPL code. Distributing
+the edge image conveys `ultralytics` under AGPL-3.0; whether the edge program as a whole then falls under AGPL-3.0 is a
+legal reading the licence text does not settle, and the vendor offers an Enterprise licence for commercial use, so take
+advice before shipping it. The edge image also carries LGPL and GPL libraries, among them Qt 5 (LGPL-3.0), which its
+OpenCV build loads, and Debian's `ffmpeg` with GPL-2.0-or-later and GPL-3 libraries, whose terms apply when the image is
+distributed. The case studies under `docs/` and the research datasets behind some of their figures are non-commercial,
+and the lab is not hardened: [SECURITY.md](SECURITY.md) lists the defaults to replace before any deployment.
+
 ## Licence
 
-Code: [Apache License 2.0](LICENSE). Keep the `LICENSE` and [`NOTICE`](NOTICE) files with any copy or derivative; the
-notice names the author and this repository. Documents under `docs/` (the case studies): [CC BY-NC-SA 4.0](docs/LICENSE),
-attribution required, non-commercial, share alike; commercial use of the write-ups needs permission. Footage and datasets
-keep their own licences ([media/SOURCES.md](media/SOURCES.md)).
+Code: [Apache License 2.0](LICENSE). Keep the `LICENSE` and [`NOTICE`](NOTICE) files with any copy or derivative, and
+the SPDX header at the top of each Python file; the notice names the author and this repository. The container images
+and any wheel built from `harness/` do not include `LICENSE` or `NOTICE`, so add both if you distribute one. Documents
+under `docs/` (the case studies): [CC BY-NC-SA 4.0](docs/LICENSE), attribution required, non-commercial, share alike;
+commercial use of the write-ups needs permission. Footage and datasets keep their own licences
+([media/SOURCES.md](media/SOURCES.md)).
 
 To cite or credit this work use the [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository"), or:
 edge-cv-lab, Belmark Ray Nalugon, https://github.com/blmrk/edge-cv-lab.

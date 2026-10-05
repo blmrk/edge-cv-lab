@@ -6,3 +6,10 @@ This product includes software developed by Belmark Ray Nalugon
 
 The case studies and other documents under docs/ are licensed separately, under
 CC BY-NC-SA 4.0 (docs/LICENSE). Footage and datasets keep their own licences (media/SOURCES.md).
+
+Third-party components (Python packages, container images, model weights) keep their own licences,
+listed with their sources in THIRD_PARTY.md. Some are AGPL-3.0, GPL or LGPL; see that file.
+
+The container images and any wheel built from this repository do not include LICENSE or this
+NOTICE. Anyone distributing a built image or wheel must include both themselves (Apache License
+2.0, section 4(a) and 4(d)).
