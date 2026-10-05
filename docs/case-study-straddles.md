@@ -653,6 +653,198 @@ step's fix.
 - On MTID neither the containment steps nor nms050 lower the judged extra enters (16 each). That was not asked of them:
   MTID has no baseline enter on a vehicle another track is on, and its 2 part enters are static.
 
+### On a second clip
+
+The result above is a per-enter account on one 47.2 s clip, and one clip is its main caveat (Limitations). This part
+declares the same steps on a second annotated clip, UA-DETRAC test sequence MVI_40855. Its baseline has no second-box
+enter, so it cannot lift that caveat for the fix: the steps run on it as a no-harm replication (What the result may
+claim). This part was committed before any step ran on this clip, and no result on this clip changes it.
+
+**The clip.** 960x540 at 25 fps, 1090 frames, 43.6 s (`ffprobe -count_frames`). A fixed, elevated camera over a large
+signalised intersection, daytime. The inbound approach is queued several vehicles abreast at a red light from the first
+frame and released partway through the clip; on its left an outbound carriageway stays jammed throughout, and a cross
+street runs through the foreground. The annotated classes are car, van and bus. The licence and the rules are
+MVI_40714's: metrics and the citation only, and the clip, its annotations and every file derived from them stay in the
+gitignored `media/` and `harness/runs/`. Source, byte sizes and sha256 in `media/SOURCES.md`; the check that the mp4
+lines up with the annotations in [datasets.md](datasets.md). `scripts/detrac_to_gt.py` gives 29802 boxes in 55 tracks,
+after dropping 291 boxes centred in the sequence's three ignored regions.
+
+**Zone.** A polygon over the inbound approach: its near edge on the stop line, its far edge in a gap between rows of the
+queue, clear of the ignored regions. It was chosen from the frames and the annotations only, without reading any
+detector output, though the detections and the baseline tracks already existed when it was drawn
+(`runs/MVI_40855.zone.json`, written in Reproduce). Moving any one of its 6 edges 5 px out or in along its normal leaves
+the visit count at 23 (Reproduce).
+
+**Visit truth.** The debounced counter at its defaults on the annotated tracks: 23 visits (`runs/MVI_40855.truth.json`).
+6 of them are vehicles already in the zone at the first frame, queued at the red light, stamped 160 ms (5) and 200 ms
+(1); the other 17 drive in later.
+
+**Detections and tracks**, made with MVI_40714's commands with the names swapped (Reproduce): 50286 detections over
+frames 0 to 1089, and ByteTrack at its defaults on them, 273 track IDs and 31614 boxes.
+
+**The baseline under the rules**, on the saved baseline files, with no filter applied and no tracker run (Reproduce). By
+vehicle:
+
+| clip, counter | truth vehicles | enters | found | missed (vehicle) | extra | duplicate | part | again | no truth visit | no annotated box (tracks) | not judged |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MVI_40855, debounced | 23 | 25 | 23 | none | 2 | 0 | 0 | 0 | 0 | 2 (69, 230) | 0 |
+| MVI_40855, zone rule 30 px | 23 | 23 | 23 | none | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+
+The baseline finds all 23 truth vehicles at both settings. Its 2 extra enters, track 69 at 680 ms and track 230 at 4040
+ms, lie on no annotated box; with the zone rule neither enters. No baseline enter on this clip is a second box: none is
+a duplicate, a part or an again.
+
+Per detection, scored after the mask:
+
+| clip | detections | scored | vehicle | duplicate | part | only | other | not judged | nested annotated vehicle-frames |
+|---|---|---|---|---|---|---|---|---|---|
+| MVI_40855 | 50286 | 29838 | 22267 | 3931 | 979 | 294 | 2367 | 0 | 2421, on 16 vehicles |
+
+20448 of the 50286 detections (0.407) are centred in an ignored region and not scored. The annotations and the
+detections both run from frame 0 to 1089, so no detection is not judged.
+
+**Declared with this baseline in view.** As with the design above, this is not blind: it is written after both tables
+above had been printed. Nothing in the design is changed for this clip.
+
+**The declaration.** The scorer, the seven steps with their parameters, the thresholds and the winner rule above apply
+unchanged, to this clip on its own. Read for this clip, with the counter at its defaults, the conditions are:
+
+1. MVI_40855 by vehicle: all 23 vehicles the baseline found are still found. A step that loses a found vehicle does not
+   qualify, as declared, whatever extra enters it removes.
+2. MVI_40855 by vehicle: fewer extra enters than the baseline's 2.
+3. MTID by vehicle, condition 3 as measured under Results, where every step meets it. No step is run on MTID again.
+4. MTID by `replay.score`, condition 4 as measured under Results, where every step meets it.
+
+The winner on this clip is the qualifying step with the fewest MVI_40855 extra enters. A tie goes to the fewer lost
+vehicle-frames, MVI_40855 and MTID summed (MTID's as under Results; a step that changes no detection counts 0); a tie
+after that gives joint winners, none preferred. If no step qualifies, the result on this clip is negative. Conditions 3
+and 4 and the tie-break carry MTID figures measured on the edge image under Results, so no step runs on this clip unless
+the image prints Ultralytics 8.4.170, torch 2.14.1+cpu and the model sha256 under Results
+(`f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36`), and MTID dumped again at NMS IoU 0.7 is
+byte-identical to `runs/dets.agnostic.jsonl`; if either fails, the steps do not run and the results say so. nms050 runs
+only if the clip dumped again at NMS IoU 0.7 is byte-identical to `runs/MVI_40855.dets.jsonl`; if it is not, nms050 is
+dropped on this clip, no nms050 row is computed, and the results say why. Each step is scored as declared above: the
+visits table against the clip's 23 truth visits, on enter time, 2 s tolerance; by vehicle at 0 and 30 px, with the
+extras removed and new against this clip's baseline at the same setting; per detection, for the steps that change
+detections, with the vehicles behind every loss. The same checks come before any row is read: the 0.7 `cmp` on this
+clip, the baseline step's tracks against the saved file, its rows against the baseline above, and any enter whose frame
+differs between the tracks in memory and the saved file. Every step is reported; nothing is left out.
+
+The removed and new columns compare duplicate, part and again extras only, as declared. An enter on no annotated box
+has no vehicle, so the per-enter table below compares those by time alone, read from the `--dets` run's table
+`extras, min_travel_px 0`: a baseline enter on no annotated box (track 69 at 680 ms, track 230 at 4040 ms) is removed
+when the step has no enter on no annotated box within 2000 ms of it, and kept otherwise; a step's enter on no annotated
+box is new when the baseline has none within 2000 ms of it.
+
+**The question, stated before the run.** On MVI_40855, does contain090_same, the winner on MVI_40714, qualify and lower
+the extra enters below the baseline's 2? Does any other step beat it under the rule above?
+
+**What the result may claim.** A per-enter account on one more clip of 43.6 s: which of the baseline's 2 extra enters a
+step removes, which extras it adds and of what kind, and which found vehicles and vehicle-frames it loses. No rate,
+percentage or general claim. The two clips are not pooled: no figure is summed or averaged across MVI_40714 and
+MVI_40855, and the result on MVI_40714 stands as declared, whatever this clip gives. The baseline here has no
+second-box enter, so by the wording declared above (a fix for second boxes only for the second-box enters it removes,
+less the new ones) no step can be called a fix for second boxes on this clip: a step with fewer enters on no annotated
+box removes enters that are not second boxes. So the steps run on this clip as a no-harm replication, a decision taken
+with this baseline in view: what the run shows is whether any step loses a found vehicle, whether it adds a second-box
+enter, and what it does per detection. The winner rule still applies on this clip, and its outcome is reported whatever
+it is.
+
+#### Results on the second clip
+
+Not run yet. Every cell is TBD until the commands marked not run yet at the end of Reproduce have run, after this
+subsection is committed; the n/a and "unchanged" cells are declared above.
+
+Checks before any row is read:
+
+- The gate, before any step runs: the edge image's versions and model sha256 against those under Results, and MTID's
+  0.7 dump against `runs/dets.agnostic.jsonl`: TBD.
+- The 0.7 dump byte-identical to the saved detections: TBD.
+- The baseline step's tracks against `runs/MVI_40855.bytetrack.jsonl`, sorted, and its rows against the baseline above:
+  TBD.
+- Enters whose frame differs from the saved baseline file's: TBD.
+
+Visits, MVI_40855, against its 23 truth visits:
+
+| key | enters | static | moving | matched | false visits | missed visits | f1 | moving f1 | queue matched | queue false |
+|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| birth040 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | n/a | n/a |
+| birth050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | n/a | n/a |
+| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | n/a | n/a |
+
+By vehicle, MVI_40855, counter at its defaults (this table decides the winner on this clip):
+
+| key | found | missed | extra | duplicate | part | again | no truth visit | no annotated box | removed | new |
+|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| birth040 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| birth050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+By vehicle, MVI_40855, zone rule 30 px, against the zone rule's own split of the baseline (the baseline row is the zone
+rule alone, a reference):
+
+| key | found | missed | extra | duplicate | part | again | no truth visit | no annotated box | removed | new |
+|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| birth040 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| birth050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+Per detection, MVI_40855, scored after the mask:
+
+| key | vehicle | duplicate | part | only | other | not judged | duplicate change | part change | lost | lost nested | only lost | fit lost |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| birth040 | unchanged (tracker setting) | | | | | | | | | | | |
+| birth050 | unchanged (tracker setting) | | | | | | | | | | | |
+| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+Vehicle-frames lost against the baseline, by vehicle: TBD.
+
+The rule on this clip, counter at its defaults; conditions 3 and 4 are MTID's, under Results:
+
+| candidate | 1. MVI_40855: the baseline's 23 still found | 2. MVI_40855: under 2 extra | qualifies | lost vehicle-frames, MVI_40855 + MTID |
+|---|---|---|---|---|
+| contain080 | TBD | TBD | TBD | TBD |
+| contain090 | TBD | TBD | TBD | TBD |
+| contain080_same | TBD | TBD | TBD | TBD |
+| contain090_same | TBD | TBD | TBD | TBD |
+| birth040 | TBD | TBD | TBD | TBD |
+| birth050 | TBD | TBD | TBD | TBD |
+| nms050 | TBD | TBD | TBD | TBD |
+
+Winner on this clip: TBD.
+
+Per enter, MVI_40855, counter at its defaults:
+
+| step | baseline extras removed (tracks 69 and 230, no annotated box) | baseline extras kept | new extras, by kind | found vehicles lost |
+|---|---|---|---|---|
+| contain080 | TBD | TBD | TBD | TBD |
+| contain090 | TBD | TBD | TBD | TBD |
+| contain080_same | TBD | TBD | TBD | TBD |
+| contain090_same | TBD | TBD | TBD | TBD |
+| birth040 | TBD | TBD | TBD | TBD |
+| birth050 | TBD | TBD | TBD | TBD |
+| nms050 | TBD | TBD | TBD | TBD |
+
 ## In the live service (opt-in)
 
 The winner, contain090_same, needs a step between detection and tracking, which `model.track()` does not offer
@@ -876,7 +1068,10 @@ enters is measured in the replay harness only (What the live check may claim).
 ## Limitations
 
 - One clip, one detector, one camera, 47.2 s, 27 visits. The headline figure rests on a single enter, and that enter's
-  box lies mostly on one car.
+  box lies mostly on one car. A second clip, MVI_40855, is declared for the second-box steps (On a second clip, under
+  Fix); it has not been run, and its results are TBD. It cannot lift this caveat: its baseline has no second-box enter
+  (its 2 extra enters lie on no annotated box), so it shows whether a step keeps the 23 vehicles found there and adds
+  no second-box enter, not that the fix carries over.
 - 11 of the 27 truth visits are vehicles already in the zone at the first frame. Under the zone rule they are stamped
   when they move, so the rule cannot be scored by time against this truth.
 - The truth carries enters only, no exits; visits are matched on enter time, greedily in time order, so the time match
@@ -911,8 +1106,10 @@ enters is measured in the replay harness only (What the live check may claim).
 - On MTID, part and only labels can be static objects the detector scores as vehicles (the phantom study's lane dashes
   and bins) lying under a passing vehicle's annotated box, which the rules cannot tell from a second box; MTID's part
   and only counts are not read as second boxes.
-- The second-box steps are tried on one clip, with one detector and one tracker (ByteTrack); MTID and the queue fixture
-  check only that a step does no harm.
+- The second-box steps have been run on one clip, with one detector and one tracker (ByteTrack); MTID and the queue
+  fixture check only that a step does no harm. Their run on a second clip, MVI_40855, is declared and not run yet (On a
+  second clip): its results are TBD, and the two clips are not pooled. That clip's baseline has no second-box enter, so
+  it too can check only that a step does no harm.
 - The found set puts no time limit on a found enter: it is the vehicle's first matching enter whenever it commits,
   where the time match allows 2 s. A step that delays a vehicle's enter keeps that vehicle found.
 - The opt-in filter is checked live on MTID only (In the live service (opt-in)): three runs and a repeat of any invalid
@@ -1326,6 +1523,97 @@ cd harness && python -c "
 from replay.detections import read_detections; from replay.secondbox import contained
 d = read_detections('runs/dets.agnostic.jsonl'); k = contained(d, 0.9, same_class=True)
 print('replay, MTID, contain090_same at conf 0.1: detections', len(d), '| dropped', len(d) - len(k), '| share', round((len(d) - len(k)) / len(d), 4))" && cd ..
+# The second clip, MVI_40855 (On a second clip, under Fix). From the repo root, with media/UA-DETRAC/MVI_40855.mp4 and
+# MVI_40855.xml in place (media/SOURCES.md; the alignment check is in docs/datasets.md). RUN before the declaration was
+# committed, from here down to the per-detection labels: the clip, the zone, the annotated boxes and visit truth, the
+# detections and ByteTrack (run before the zone was drawn), and the baseline under the rules on the saved files, host only.
+ffprobe -v error -count_frames -select_streams v:0 \
+  -show_entries stream=codec_name,width,height,r_frame_rate,nb_read_frames,duration media/UA-DETRAC/MVI_40855.mp4
+cd harness
+echo '{"polygon": [[178, 309], [509, 343], [643, 233], [673, 215], [598, 208], [530, 184]], "frame_size": [960, 540], "video": "UA-DETRAC/MVI_40855.mp4"}' \
+  > runs/MVI_40855.zone.json
+python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/MVI_40855.xml --out runs/MVI_40855 --zone runs/MVI_40855.zone.json
+# the truth: visits, the vehicles already in the zone at the first frame, classes, ignored regions; then the visit count
+# with each zone edge moved 5 px out and in along its normal (annotations only, no detector output)
+python -c "
+import json, math
+from replay.geometry import point_in_polygon; from replay.schema import read_tracks; from replay.zones import DebouncedZoneCounter, run
+poly = [tuple(p) for p in json.load(open('runs/MVI_40855.zone.json'))['polygon']]
+gt = sorted(read_tracks('runs/MVI_40855.gt.jsonl'), key=lambda b: (b.frame, b.track_id))
+en = [e for e in run(DebouncedZoneCounter(poly), gt) if e.kind == 'enter']
+f0 = {g.track_id for g in gt if g.frame == 0 and point_in_polygon(g.footpoint, poly)}
+print('annotated frames', gt[0].frame, gt[-1].frame, '| classes', sorted({g.cls for g in gt}), '| ignored regions',
+      len(json.load(open('runs/MVI_40855.ignored.json'))['regions_xyxy']))
+print('visits', len(en), '| footpoint in the zone at frame 0:', len(f0), '(id, enter ms)',
+      sorted((e.track_id, e.ts_ms) for e in en if e.track_id in f0), '| the other visits', sum(e.track_id not in f0 for e in en))
+n, shift = len(poly), []
+for i in range(n):
+    (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]; L = math.hypot(x1 - x0, y1 - y0)
+    for d in (-5, 5):
+        p = list(poly); p[i], p[(i + 1) % n] = [(x + d * (y1 - y0) / L, y - d * (x1 - x0) / L) for x, y in (poly[i], poly[(i + 1) % n])]
+        shift.append(sum(e.kind == 'enter' for e in run(DebouncedZoneCounter(p), gt)))
+print('visits with each of the', n, 'edges moved 5 px either way along its normal:', shift)"
+# detections and ByteTrack, exactly as for MVI_40714 with the names swapped: already run, before the zone was drawn
+cd .. && docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge python scripts/dump_detections.py \
+  --video ../media/UA-DETRAC/MVI_40855.mp4 --fps 25 --model /app/yolov8n.pt --out runs/MVI_40855.dets.jsonl
+docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge python -m replay.track \
+  --dets runs/MVI_40855.dets.jsonl --tracker bytetrack --out runs/MVI_40855.bytetrack.jsonl
+cd harness
+python -c "import json; t = [json.loads(l) for l in open('runs/MVI_40855.bytetrack.jsonl')]; print(len({d['track_id'] for d in t}), 'ids', len(t), 'boxes')"
+# the baseline under the rules (On a second clip), on the saved files, with no filter applied and no tracker run: each
+# enter put down by vehicle without and with the zone rule, then each baseline detection labelled after the mask
+for px in 0 30; do
+  python -m replay.secondbox --tracks runs/MVI_40855.bytetrack.jsonl --gt runs/MVI_40855.gt.jsonl --zone runs/MVI_40855.zone.json \
+    --min-travel-px $px
+done
+python -c "
+import json; from collections import Counter
+from replay import secondbox as SB; from replay.detections import read_detections; from replay.schema import read_tracks
+from replay.straddle import mask
+every, gt = read_detections('runs/MVI_40855.dets.jsonl'), list(read_tracks('runs/MVI_40855.gt.jsonl'))
+dets = mask(every, json.load(open('runs/MVI_40855.ignored.json'))['regions_xyxy'])  # the baseline's: no filter, then the mask
+n, nest = Counter(l for l, *_ in SB.classify(dets, gt)), SB.nested(gt)
+print('MVI_40855 | annotated frames', min(x.frame for x in gt), max(x.frame for x in gt), '| detection frames',
+      min(x.frame for x in every), max(x.frame for x in every), '| detections', len(every), 'scored', len(dets),
+      '| centred in an ignored region', len(every) - len(dets), round((len(every) - len(dets)) / len(every), 3))
+print('   labels', {k: n[k] for k in SB.LABELS})
+print('   nested annotated vehicle-frames', len(nest), 'on', len({v for f, v in nest}), 'vehicles')"
+cd ..
+# NOT RUN YET: the second-box steps on MVI_40855, to run only after On a second clip is committed; they fill its Results
+# on the second clip. Edge image, CPU, no build and no download. First the gate: the versions and the model's hash, which
+# must be those under Results, and MTID dumped again at NMS IoU 0.7 (under runs/verify/), which must be byte-identical
+# to its saved detections; if either fails, no step runs. Then the clip dumped again at NMS IoU 0.5 and 0.7, the 0.7
+# dump compared byte for byte with the saved detections (if it differs, nms050 is dropped on this clip and no nms050 row
+# is computed); every step, each step's tracks written under runs/secondbox/MVI_40855, and the baseline step's every
+# enter printed from its tracks in memory; the baseline step's tracks against the saved ones; then the by-vehicle
+# baseline above again, which must print the same.
+e() { docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge "$@"; }
+e python -c "import hashlib, torch, ultralytics
+v = (ultralytics.__version__, str(torch.__version__), hashlib.sha256(open('/app/yolov8n.pt', 'rb').read()).hexdigest())
+print(*v); raise SystemExit(0 if v == ('8.4.170', '2.14.1+cpu', 'f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36') else 1)"; c0=$?
+e python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --iou 0.7 --out runs/verify/mtid.iou0.7.jsonl
+cmp harness/runs/verify/mtid.iou0.7.jsonl harness/runs/dets.agnostic.jsonl; c4=$?
+if [ "$c0" -ne 0 ] || [ "$c4" -ne 0 ]; then
+  echo "not the image under Results (versions, hash or the MTID 0.7 dump differ): no step runs on MVI_40855"
+else
+  for iou in 0.5 0.7; do
+    e python scripts/dump_detections.py --video ../media/UA-DETRAC/MVI_40855.mp4 --fps 25 --model /app/yolov8n.pt --iou $iou \
+      --out runs/MVI_40855.dets.iou$iou.jsonl
+  done
+  cmp harness/runs/MVI_40855.dets.iou0.7.jsonl harness/runs/MVI_40855.dets.jsonl; c3=$?
+  m2=()  # nms050 runs only when the 0.7 dump is byte-identical to the saved detections
+  if [ "$c3" -eq 0 ]; then m2=(--redetected nms050=runs/MVI_40855.dets.iou0.5.jsonl)
+  else echo "the MVI_40855 0.7 dump differs from the saved detections: nms050 dropped on this clip, no nms050 row computed"; fi
+  e python -m replay.secondbox --dets runs/MVI_40855.dets.jsonl --zone runs/MVI_40855.zone.json --truth runs/MVI_40855.truth.json \
+    --gt runs/MVI_40855.gt.jsonl --ignored runs/MVI_40855.ignored.json "${m2[@]}" --out-dir runs/secondbox/MVI_40855
+  cd harness
+  diff <(sort runs/secondbox/MVI_40855/baseline.jsonl) <(sort runs/MVI_40855.bytetrack.jsonl)
+  for px in 0 30; do
+    python -m replay.secondbox --tracks runs/MVI_40855.bytetrack.jsonl --gt runs/MVI_40855.gt.jsonl --zone runs/MVI_40855.zone.json \
+      --min-travel-px $px
+  done
+  cd ..
+fi
 ```
 
 ## Citation
