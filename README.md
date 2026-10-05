@@ -168,4 +168,10 @@ More in [docs/architecture.md](docs/architecture.md).
 
 ## Licence
 
-MIT. Footage and datasets keep their own licences.
+Code: [Apache License 2.0](LICENSE). Keep the `LICENSE` and [`NOTICE`](NOTICE) files with any copy or derivative; the
+notice names the author and this repository. Documents under `docs/` (the case studies): [CC BY-NC-SA 4.0](docs/LICENSE),
+attribution required, non-commercial, share alike; commercial use of the write-ups needs permission. Footage and datasets
+keep their own licences ([media/SOURCES.md](media/SOURCES.md)).
+
+To cite or credit this work use the [`CITATION.cff`](CITATION.cff) (GitHub's "Cite this repository"), or:
+edge-cv-lab, Belmark Ray Nalugon, https://github.com/blmrk/edge-cv-lab.

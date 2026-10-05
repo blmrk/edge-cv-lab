@@ -1,0 +1,17 @@
+The documents in this directory (the case studies, architecture, tracker and dataset notes, and the images under
+img/, screenshots/ and footage/ that this repository generated) are licensed under the Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International licence (CC BY-NC-SA 4.0).
+
+Copyright 2026 Belmark Ray Nalugon
+
+You may share and adapt them for non-commercial purposes, with attribution to the author and a link to
+https://github.com/blmrk/edge-cv-lab, and any adaptation under the same licence. Commercial use needs the author's
+permission.
+
+Full licence text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+Summary: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+Footage and datasets referenced here keep their own licences, listed in ../media/SOURCES.md; figures derived from
+research-licensed datasets are reported as metrics only, as those licences require.
+
+The code in this repository is licensed separately, under the Apache License, Version 2.0 (../LICENSE, ../NOTICE).

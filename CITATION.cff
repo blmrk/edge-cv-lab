@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software or its case studies, please cite it as below."
+type: software
+title: "edge-cv-lab: a virtual edge computer-vision lab that reproduces and fixes video-analytics failures"
+authors:
+  - family-names: Nalugon
+    given-names: Belmark Ray
+repository-code: "https://github.com/blmrk/edge-cv-lab"
+url: "https://github.com/blmrk/edge-cv-lab"
+license: Apache-2.0
+date-released: 2026-10-05
+keywords:
+  - computer vision
+  - edge computing
+  - object tracking
+  - MQTT
+  - reproducibility
