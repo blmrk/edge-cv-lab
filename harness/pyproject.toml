@@ -2,10 +2,11 @@
 name = "edge-cv-replay"
 version = "0.1.0"
 requires-python = ">=3.10"
+license = "Apache-2.0"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "numpy>=1.26"]  # numpy: the ByteTrack adapter tests (ultralytics is stubbed there)
 video = ["ultralytics>=8.3", "opencv-python-headless"]
 viz = ["opencv-python-headless", "numpy", "matplotlib", "imageio", "pillow>=9.1"]  # 9.1: Image.Quantize and Image.Dither enums
 trackeval = ["numpy", "scipy"]  # scripts/trackeval_run.py; TrackEval itself is cloned, see its docstring
