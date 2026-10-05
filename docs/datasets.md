@@ -64,5 +64,28 @@ for n in (1, 590, 1180):
 cd ../../harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/MVI_40714.xml --out runs/MVI_40714
 ```
 
+A second test sequence, MVI_40855 (task C's second clip, logged in `media/SOURCES.md`), was fetched from the same mirrors
+and checked the same way: 1090 frames at 25 fps, and img00001, img00545 and img01090 (kept in `check-40855/`) match
+decoded frames 0, 544 and 1089 best. The converter prints
+`runs/MVI_40855.gt.jsonl: 29802 boxes, 55 tracks, 291 boxes dropped in ignored regions`. The check is the one above with
+the file names swapped:
+
+```bash
+cd media/UA-DETRAC
+ffprobe -v error -count_frames -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_read_frames MVI_40855.mp4
+python3 -c "
+import cv2, numpy as np
+cap = cv2.VideoCapture('MVI_40855.mp4'); frames = []
+while True:
+    ok, f = cap.read()
+    if not ok: break
+    frames.append(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY).astype(np.float32))
+for n in (1, 545, 1090):
+    j = cv2.imread(f'check-40855/img{n:05d}.jpg', cv2.IMREAD_GRAYSCALE).astype(np.float32)
+    d = {k: round(float(np.abs(frames[k] - j).mean()), 2) for k in range(n - 3, n + 2) if 0 <= k < len(frames)}
+    print(f'img{n:05d}.jpg best matches decoded frame', min(d, key=d.get), d)"
+cd ../../harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/MVI_40855.xml --out runs/MVI_40855
+```
+
 Citation: Wen et al., "UA-DETRAC: A New Benchmark and Protocol for Multi-Object Detection and Tracking",
 Computer Vision and Image Understanding, 2020.
