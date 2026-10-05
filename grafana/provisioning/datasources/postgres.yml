@@ -4,7 +4,7 @@ datasources:
     uid: lab-pg
     type: postgres
     url: postgres:5432
-    user: postgres
+    user: grafana_ro  # reads the lab tables, no table writes; made by db/init.sql
     isDefault: true
     secureJsonData: { password: lab }
     jsonData: { database: lab, sslmode: disable, postgresVersion: 1600 }

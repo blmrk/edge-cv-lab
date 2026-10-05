@@ -46,6 +46,7 @@ services:
     environment: { POSTGRES_PASSWORD: lab, POSTGRES_DB: lab }
     ports: ["${LAB_BIND:-127.0.0.1}:5432:5432"]
     restart: unless-stopped
+    volumes: ["./db:/docker-entrypoint-initdb.d:ro"]  # grafana_ro, Grafana's role: reads the lab tables, no table writes; runs on an empty volume only
 
   ingest:
     build: ./services/ingest
@@ -89,6 +90,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_SECURITY_ADMIN_PASSWORD: lab
+      GF_SECURITY_CONTENT_SECURITY_POLICY: "true"  # Grafana's default CSP template
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/edge-cv-lab.json
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
