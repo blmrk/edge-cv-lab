@@ -18,7 +18,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
 | `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run in the edge image on MVI_40714 and MTID, every step (`--dets`, both clips dumped again at NMS IoU 0.7 and 0.5), and on the host on the saved baseline files (`--tracks`); results in `docs/case-study-straddles.md` |
-| Opt-in second-box filter in the edge (`CONTAIN_SHARE=0.9` with `CONTAIN_SAME_CLASS=1` is contain090_same, before ByteTrack; off by default) | tested on the host (`harness/tests/test_edge.py`); checked live on MTID only: off, on, off on one image, every run valid, (a) to (c) pass (`docs/case-study-straddles.md`, In the live service (opt-in)); its effect on enters measured in the replay harness only |
+| Opt-in second-box filter in the edge (`CONTAIN_SHARE=0.9` with `CONTAIN_SAME_CLASS=1` is contain090_same, before ByteTrack; off by default) | tested on the host (`harness/tests/test_edge.py`); checked live on two clips, off, on, off on one image, every run valid: on MTID (a) to (c) pass; on MVI_40714 (a) to (d) pass, the on run logging fewer enters than both off runs, by more than they differed (`docs/case-study-straddles.md`, In the live service (opt-in)); its effect on enters measured in the replay harness |
 
 ## Case studies
 
@@ -30,7 +30,7 @@ kind has a follow-up study of its own (task C, closed):
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is measured in `docs/case-study-straddles.md` |
-| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | done: `docs/case-study-straddles.md`; straddles are a measured negative on the clip, the fix moved to second boxes, and by a rule declared in advance contain090_same wins, in the replay harness only (task C, closed); opt-in in the edge since 2026-10-05, checked live on MTID only |
+| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | done: `docs/case-study-straddles.md`; straddles are a measured negative on the clip, the fix moved to second boxes, and by a rule declared in advance contain090_same wins, in the replay harness only (task C, closed); opt-in in the edge since 2026-10-05, checked live on MTID and on MVI_40714, where the on run logged fewer enters than both off runs, by more than they differed |
 | Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
@@ -83,6 +83,13 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
     not that the fix carries over: on MTID the replay gives contain090_same the baseline's counts, the live edge has not
     run on a clip where the filter removes an enter, and the filter's effect on enters is measured in the replay harness
     only. `docs/case-study-straddles.md`, In the live service (opt-in).
+17. The filter's live check on the clip under study, UA-DETRAC MVI_40714 (metrics only), streamed locally through
+    MediaMTX: compose takes the camera's clip, the edge's zone and the RTSP bind from env (`VIDEO`, `ZONE_POLYGON`,
+    `RTSP_BIND`; unset, as before). Declared and committed before any run, with (d) as its scored claim; ran on
+    2026-10-05: off, on, off on one image, CPU; every run valid, (a) to (c) pass, and (d) passes: the on run logged
+    fewer enters than either off run, by more than the two off runs differed, the direction the replay gives. The on
+    path differs from the off path in more than the filter, and which enters the on run did not log, and whether they
+    were second boxes, is not known live. `docs/case-study-straddles.md`, On the clip under study.
 
 ## Known rough edges
 - The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard (now
@@ -92,8 +99,11 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
   on a quiet camera a lost visit stays open until then.
 - With `CONTAIN_SHARE` on, `TRACKER` is not used: the on path always runs `bytetrack.yaml`'s defaults through the
   replay adapter, and the edge exits at start when `TRACKER` is set to anything but `bytetrack.yaml`.
-- The filter's live check ran on MTID only, where the replay gives contain090_same the baseline's counts: it shows the
-  opt-in path runs and does no gross harm, not that the fix carries over (`docs/case-study-straddles.md`).
+- The filter's live check ran on two clips, three runs each, one image, CPU. On MTID, where the replay gives
+  contain090_same the baseline's counts, it shows the opt-in path runs and does no gross harm. On MVI_40714 the on run
+  logged fewer enters than both off runs, by more than they differed: a direction, not a size. The on path differs from
+  the off path in more than the filter, and which enters the on run did not log is not known live
+  (`docs/case-study-straddles.md`).
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
   on 2026-09-28, and runs on 8.4.170, the version the image pins since 2026-10-05 with torch 2.14.1. The pinned image
   was rebuilt on 2026-10-05 (`docker compose --profile video build edge`): it reports 8.4.170 and 2.14.1+cpu, and a
