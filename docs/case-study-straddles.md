@@ -652,6 +652,192 @@ step's fix.
 - On MTID neither the containment steps nor nms050 lower the judged extra enters (16 each). That was not asked of them:
   MTID has no baseline enter on a vehicle another track is on, and its 2 part enters are static.
 
+## In the live service (opt-in)
+
+The winner, contain090_same, needs a step between detection and tracking, which `model.track()` does not offer
+(Results). The edge service (`services/edge/src/main.py`) now has that step, off by default. This section says what
+each setting runs, and declares a live check on the MTID clip, the one `make up-video` streams (`media/sample.mp4`),
+before any run of it.
+
+**The flags**, set like the edge's other settings (`CONTAIN_SHARE=0.9 make up-video`):
+
+- `CONTAIN_SHARE`: unset or 0 is off, compose's default. A share above 0 and up to 1 turns the filter on: a detection
+  with that share or more of its own area inside a strictly higher-scoring detection of its frame is dropped.
+- `CONTAIN_SAME_CLASS`: 1, compose's default, drops a box only inside one of its own detector class, as the `_same`
+  steps do; 0 drops it inside any class.
+- `CONTAIN_SHARE=0.9` with `CONTAIN_SAME_CLASS=1` is contain090_same. 0.9 is the declared step's share (Declared
+  design), a parameter, not a measurement.
+- Any other value of either flag stops the edge at start, before the model loads, with a message naming both flags: a
+  typo does not run without the filter, or with one nobody asked for.
+
+**Off, the default**, runs the edge as before: `model.track()` on the stream with the `TRACKER` yaml (compose sets
+`bytetrack.yaml`), COCO car, bus and truck, class-agnostic NMS and no `conf`; each tracked box goes to the debounced
+counter, and the event publish, the occupancy gauge and the heartbeat are unchanged. The one addition is a line in the
+log at start, `contain: off`.
+
+**On**, the edge logs at start `contain: on share=0.9 same_class=1 conf=0.1 tracker=bytetrack.yaml` (with the share
+and class flag that are set) and creates one ByteTrack tracker, the replay's adapter
+(`replay.trackers.create("bytetrack")`) at `bytetrack.yaml`'s defaults, once per process: every `BYTETracker`
+restarts the track-ID counter they share. It runs `model.predict()` on the stream with `conf` 0.1, the same classes
+and class-agnostic NMS, and no tracker. On each frame it turns the boxes into detections, numbered by the frames read
+since start; drops second boxes with `replay.secondbox.contained`, the code the replay ran; and updates the tracker
+with what is left, on every frame, empty ones included. The tracker's boxes go to the same counter, publish, gauge and
+heartbeat as on the off path. At each heartbeat the edge also logs, at the start of a line:
+
+```
+contain ts_ms=<that frame's ts_ms> frames=<frames in the window> dets=<D> dropped=<X> filter_ms=<M>
+```
+
+The window is the heartbeat's, and its frame count is the heartbeat's fps numerator. D is the boxes `model.predict()`
+gave in the window, after NMS and the class selection and before containment; X is how many of them containment
+dropped (D less those kept); M is the milliseconds spent in `contained()`. The counts restart at each heartbeat.
+
+**Why `conf` 0.1.** `model.track()` sets `conf` to 0.1 when none is passed, and `model.predict()` alone would take
+0.25 (the pre-run gate in Reproduce prints both lines from the image's Ultralytics). Passing 0.1 keeps the on path at
+the off path's threshold, which is also the one the replay's detections were dumped at. Neither path passes an NMS IoU:
+both take Ultralytics' default, the 0.7 the replay's detections were dumped at (Declared design).
+
+**`TRACKER` with the filter on.** The on path does not use `TRACKER`: it always runs `bytetrack.yaml`'s defaults through
+the replay adapter. So that another yaml, a birth-score one say, is not dropped silently, the edge exits at start when
+the filter is on and `TRACKER` is set to anything but `bytetrack.yaml`. With the filter off, `TRACKER` works as before.
+
+**Nothing new leaves the edge.** No MQTT payload or topic, ingest table or Grafana panel is added or changed; the
+filter's counts go to the edge's log only.
+
+`harness/tests/test_edge.py` drives the edge's `main()` on the host, with the broker client, the ID generator and the
+model stubbed and numpy blocked, as in CI. It pins the off path's `model.track()` call and its events, the on path's
+`model.predict()` call and its one tracker, the tracker's input frame by frame against the replay's filter (with the
+pure-Python IoU tracker standing in for ByteTrack), the heartbeat line's counts, the MQTT topics, payload keys, QoS and
+retain on both paths, and the flags' rules.
+
+### Declared before any run
+
+This part was committed before any live run, and no run result changes it. Its thresholds, windows and run settings
+are declared parameters, not measurements.
+
+**Runs.** Three runs on the MTID clip, in the order off1, on, off2, so that drift over the session does not fall on
+the on run alone. Each run is `make down`, then `make up-video` with `CONTAIN_SHARE` 0, 0.9 and 0 in turn,
+`OCCUPANCY_GAUGE_MS=500` and `GRAFANA_PORT=3001`; everything else stays at compose's defaults: `CONTAIN_SAME_CLASS=1`,
+`MIN_TRAVEL_PX=0`, `TRACKER=bytetrack.yaml`. The occupancy gauge is the run clock in all three runs (the window below
+starts at its first stored sample) and is not reported; its sampler only reads the counter. `make down` removes the
+containers and their logs, so each run's figures and log are saved before the next run starts.
+
+**One image.** The edge image is built once, before off1 (`docker compose --profile video build edge`), and its ID is
+recorded before the first run, at each run and after the last; `make up-video` builds every time, so a run is valid
+only if its ID equals the one before off1 and the one after the last run (below). Nothing under `services/edge` or
+`harness/replay` changes from this declaration's commit until the last run ends (off2, or a repeat after it), and no
+other build or container runs alongside the lab. The clip's sha256 and its ffprobe frame count and rate are recorded.
+
+**Gate, before the first run.** The runs do not start if either fails:
+
+- the image reports Ultralytics 8.4.170 and torch 2.14.1+cpu, the versions the replay ran on (Results);
+- `Model.track`'s source in the image sets `conf` to 0.1 when none is passed. Otherwise the on path's `conf` 0.1 would
+  not equal the off path's.
+
+**Window, the same for every run.**
+
+- One loop of the clip, L, is 3199 frames at 30 fps (the clip's; the ffprobe line in Reproduce prints both), so three
+  loops are 319900 ms.
+- S0 is the run's first stored gauge sample, the least `zone_occupancy.ts_ms` for edge-01.
+- T0 = S0 + 30000 ms, which skips the vehicles already in the zone when the edge joins the loop.
+- The counted span is [T0, T0 + 319900 ms): three whole loops, so each run counts every part of the clip three times,
+  wherever in the loop it joined.
+- A run is read once its stored gauge samples reach S0 + 409900 ms: the 30 s skip, the span and a 60 s margin, the
+  margin because an enter is stored only with its exit. The wait polls about every 10 s and gives up after 90 polls
+  (TIMEOUT).
+
+**Measures.**
+
+- Enters and exits: `zone_events` rows for edge-01, counter `debounced`, with `ts_ms` in the span.
+- fps: ingest keeps only each device's latest heartbeat (`device_status`), so the wait polls it about every 10 s. The
+  polls are deduplicated by `updated_at`, the heartbeats with `updated_at` in the span are kept, and fps is their
+  median.
+- The filter's figures: the on run's `contain ts_ms=` lines with `ts_ms` in the span.
+- `make counts` is not used: it counts every stored event, not the span.
+
+**A valid run** meets all of these:
+
+- its edge image ID equals the ones recorded before off1 and after the last run;
+- its stored gauge samples reached S0 + 409900 ms (no TIMEOUT);
+- the edge container's restart count is 0;
+- its saved log holds exactly one `contain: ` startup line, the one its flags should print;
+- no log line contains `unresponsive` (Ultralytics' warning for a stalled stream);
+- it has at least 2 heartbeats in the span, consecutive ones at most 30 s apart;
+- it logs `contain ts_ms=` lines if and only if it is the on run.
+
+Every run is reported, invalid ones included. Validity never depends on enters, fps or drops. An invalid run is
+repeated once, right away, as `<run>.2` with the same settings (`RUNS=<run>.2` in Reproduce), and both are reported;
+(a) to (c), and the off runs' mean and range, use the valid run of each name. If the repeat is invalid too, the check
+is reported as not completed. No other run is repeated, and no setting, threshold or window is changed, because of a
+result.
+
+**Pass**, declared now, on the on run:
+
+- (a) Filter active: `dropped` summed over the span is above 0, and no heartbeat line has `dropped` above `dets`. The
+  sum is over the span, not per heartbeat window, since a window can pass with no box inside another.
+- (b) Throughput: both of these must hold.
+  1. `filter_ms` summed over the span is under 0.01 of the span (3199 ms).
+  2. Its median fps is at least 0.9 times the lower of the two off runs' medians. The bound is one-sided, so a faster
+     on run passes.
+- (c) Gross harm: its enters lie within 0.5 to 1.5 times the mean of off1's and off2's enters. This catches a broken
+  path, one with no tracks or with IDs restarting so that boxes enter again; it is not a check that nothing changed.
+
+Reported, not scored:
+
+- whether the on run's enters lie within the off runs' range. With two off runs, a run that changes nothing need not
+  land inside it;
+- exits, and heartbeats in the span;
+- the on run's `dropped` / `dets`, set beside the replay's for scale only: on MTID's saved detections at `conf` 0.1,
+  contain090_same drops 467 of 20151, 0.0232 (Per detection, MTID, under Results: contain090_same's label counts sum to
+  19684, the baseline's to 20151);
+- the `filter_ms` share, the image ID and the versions.
+
+A fail in (a), (b) or (c) is published as a fail, and the opt-in code stays merged, off by default. A fix for a code
+defect is a new commit with a new declared set of runs; the first set stays reported.
+
+### Live results
+
+TBD until the runs. The cells will come from the live check's commands at the end of Reproduce, whose analysis prints
+each run's figures and validity, then (a) to (c).
+
+Before any row is read:
+
+- the clip: sha256 TBD; frame count and rate TBD;
+- the gate: Ultralytics and torch in the image TBD; `Model.track`'s `conf` line TBD;
+- the edge image ID before off1 and after the last run: TBD.
+
+| run | image ID (short) | valid | enters | exits | heartbeats in the span | median fps | dropped / dets | filter_ms share |
+|---|---|---|---|---|---|---|---|---|
+| off1 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| on | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| off2 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+A repeated run gets its own row, `<run>.2`, under the first.
+
+- (a) filter active: TBD.
+- (b) throughput: TBD.
+- (c) gross harm: TBD.
+- The on run's enters within the off runs' range (a fact, not scored): TBD.
+
+### What the live check may claim
+
+- MTID checks that the opt-in path runs and does no gross harm, not that the fix carries over.
+- On MTID the replay gives contain090_same the baseline's counts (every frame, counter at its defaults): 39 enters; by
+  vehicle 20 found, 16 judged extra, 3 not judged (Results). The live edge has not run on a clip where the filter
+  removes an enter, so its effect on enters is measured in the replay harness only (MVI_40714: 6 of the 8 second-box
+  enters).
+- No live figure is scored against a replay figure:
+  - the live edge infers on part of the stream's frames, since Ultralytics' stream reader keeps only the newest frame;
+    the share is the run's measured median fps over the clip's 30;
+  - it reads a libx264 re-encode of the clip, with unrounded scores;
+  - ByteTrack's 30-frame lost buffer and the counter's 5- and 8-frame hysteresis (its defaults) count processed
+    frames, so they span longer than in the replay;
+  - the looped clip joins its last frame to its first.
+- A difference between the on run and the off runs is not read as the filter's effect, and a count inside their range
+  is not read as no effect.
+- The live figures are read through (a) to (c) only; beyond them the check makes no claim about the filter's effect on
+  counts.
+
 ## Limitations
 
 - One clip, one detector, one camera, 47.2 s, 27 visits. The headline figure rests on a single enter, and that enter's
@@ -694,6 +880,10 @@ step's fix.
   check only that a step does no harm.
 - The found set puts no time limit on a found enter: it is the vehicle's first matching enter whenever it commits,
   where the time match allows 2 s. A step that delays a vehicle's enter keeps that vehicle found.
+- The opt-in filter is checked live on MTID only (In the live service (opt-in)): three runs and a repeat of any invalid
+  one, one edge image, CPU. On MTID the replay gives contain090_same the baseline's counts (every frame, counter at its
+  defaults): 39 enters; by vehicle 20 found, 16 judged extra, 3 not judged (Results). So the check can show that the
+  opt-in path runs and does no gross harm, not that the fix carries over.
 
 ## Reproduce
 
@@ -1014,6 +1204,93 @@ for px in 0 30; do
   python -m replay.secondbox --tracks runs/phantoms/baseline.jsonl --gt runs/mtid.gt.jsonl --zone zone.json --min-travel-px $px
 done
 cd ..
+# NOT RUN YET: the live check declared under In the live service (opt-in), whose Live results stay TBD until
+# it runs. From the repo root, with nothing else running in Docker.
+# the opt-in second-box filter in the live edge on the MTID clip (media/sample.mp4): off, on, off on one image, each
+# read 409.9 s after its first stored gauge sample (In the live service (opt-in)); GRAFANA_PORT=3001 when 3000 is taken
+ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate,nb_frames media/sample.mp4
+shasum -a 256 media/sample.mp4
+mkdir -p harness/runs/live
+docker compose --profile video build edge
+docker image inspect edge-cv-lab-edge --format '{{.Id}}' > harness/runs/live/image.before
+docker run --rm edge-cv-lab-edge python -c "import inspect, torch, ultralytics; from ultralytics.engine.model import Model; print(ultralytics.__version__, torch.__version__); [print(l.strip()) for l in (inspect.getsource(Model.predict) + inspect.getsource(Model.track)).splitlines() if 'conf' in l and ('custom' in l or 'kwargs[' in l)]"
+q() { docker compose --profile video exec -T postgres psql -U postgres lab -At -F ' ' -c "$1"; }
+# RUNS: the runs, space-separated, off1 on off2 unless set. An invalid run is repeated with RUNS=<run>.2, from this loop
+# to the analysis (In the live service (opt-in)); a run's share comes from its name before any '.'. bash splits RUNS
+# into words anyway, zsh only with shwordsplit
+setopt shwordsplit 2>/dev/null || true
+for run in ${RUNS:-off1 on off2}; do
+  share=0; [ "${run%%.*}" = on ] && share=0.9
+  make down && CONTAIN_SHARE=$share OCCUPANCY_GAUGE_MS=500 GRAFANA_PORT=3001 make up-video
+  docker image inspect edge-cv-lab-edge --format '{{.Id}}' > harness/runs/live/$run.image
+  i=0; until [ "$(q "select coalesce(max(ts_ms)-min(ts_ms),0) from zone_occupancy where device_id='edge-01'" 2>/dev/null || echo 0)" -ge 409900 ]; do
+    i=$((i+1)); [ $i -ge 90 ] && { echo TIMEOUT $run; break; }
+    q "select (extract(epoch from updated_at)*1000)::bigint, fps from device_status where device_id='edge-01' and state='online'" >> harness/runs/live/$run.fps 2>/dev/null
+    sleep 10
+  done
+  q "select min(ts_ms), max(ts_ms) from zone_occupancy where device_id='edge-01'" > harness/runs/live/$run.span
+  q "select kind, ts_ms, track_id from zone_events where device_id='edge-01' and counter='debounced' order by ts_ms" > harness/runs/live/$run.events
+  docker inspect -f '{{.RestartCount}}' $(docker compose --profile video ps -q edge) > harness/runs/live/$run.restarts
+  docker compose --profile video logs --no-log-prefix --no-color edge > harness/runs/live/$run.edge.log 2>&1
+done
+make down
+docker image inspect edge-cv-lab-edge --format '{{.Id}}' > harness/runs/live/image.after
+# per run, every runs/live/*.span (a repeat <run>.2 included): validity, enters and exits in [T0, T0 + 3 loops),
+# median fps, the filter's counts; then (a) to (c) on the valid run of each name
+cd harness && python -c "
+import glob, os, statistics as st
+L3 = 3 * 3199 * 1000 // 30  # 319900 ms: three loops of the 3199-frame, 30 fps clip
+B = ('off1', 'on', 'off2')  # the names; a repeat <run>.2 is read under its name, the part before the .
+WANT = {'off1': 'contain: off', 'on': 'contain: on share=0.9 same_class=1 conf=0.1 tracker=bytetrack.yaml', 'off2': 'contain: off'}
+img = {open(f'runs/live/image.{w}').read().strip() for w in ('before', 'after')}
+R = {}
+for run in sorted((os.path.basename(f)[:-5] for f in glob.glob('runs/live/*.span')), key=lambda r: (B.index(r.split('.')[0]), r)):
+    name, want = run.split('.')[0], WANT[run.split('.')[0]]
+    p = f'runs/live/{run}'
+    s0, s1 = map(int, open(p + '.span').read().split())
+    t0 = s0 + 30000
+    inside = lambda t: t0 <= t < t0 + L3
+    ev = [l.split() for l in open(p + '.events').read().splitlines() if l.strip()]
+    hb = sorted({(int(a), float(b)) for a, b in (l.split() for l in open(p + '.fps').read().splitlines() if l.strip())})
+    hb = [(t, f) for t, f in hb if inside(t)]
+    log = open(p + '.edge.log').read().splitlines()
+    starts = [l for l in log if l.startswith('contain: ')]
+    lines = [dict(kv.split('=') for kv in l.split()[1:]) for l in log if l.startswith('contain ts_ms=')]
+    span = [d for d in lines if inside(int(d['ts_ms']))]
+    r = dict(enters=sum(k == 'enter' and inside(int(t)) for k, t, _ in ev), exits=sum(k == 'exit' and inside(int(t)) for k, t, _ in ev),
+             heartbeats=len(hb), fps_median=st.median(f for _, f in hb) if hb else 0.0,
+             dets=sum(int(d['dets']) for d in span), dropped=sum(int(d['dropped']) for d in span),
+             filter_ms=round(sum(float(d['filter_ms']) for d in span), 1))
+    r['over'] = sum(int(d['dropped']) > int(d['dets']) for d in lines)
+    r['drop_share'] = round(r['dropped'] / r['dets'], 4) if r['dets'] else 0.0
+    r['filter_share'] = round(r['filter_ms'] / L3, 5)
+    checks = {'image one ID': img == {open(p + '.image').read().strip()},
+              'ran past t0 + 3 loops + 60 s': s1 - s0 >= 30000 + L3 + 60000,
+              'no restart': int(open(p + '.restarts').read()) == 0,
+              'one startup line, as set': starts == [want],
+              'no stream unresponsive': not any('unresponsive' in l for l in log),
+              'heartbeats <= 30 s apart': len(hb) > 1 and max(b[0] - a[0] for a, b in zip(hb, hb[1:])) <= 30000,
+              'heartbeat lines only when on': bool(lines) == (name == 'on')}
+    r['valid'] = all(checks.values())
+    print(run, r, '| invalid:', [k for k, v in checks.items() if not v] or 'none')
+    R[run] = r
+use = {b: next((k for k in R if k.split('.')[0] == b and R[k]['valid']), None) for b in B}
+print('scored, the valid run of each name:', use)
+if None in use.values():
+    print('check not completed: no valid run of', [b for b, k in use.items() if k is None])
+else:
+    on, offs = R[use['on']], [R[use['off1']], R[use['off2']]]
+    mean_off = sum(o['enters'] for o in offs) / 2
+    print('(a) filter active:', on['dropped'] > 0 and on['over'] == 0)
+    print('(b) throughput: filter', on['filter_share'] < 0.01, '| median fps', on['fps_median'] >= 0.9 * min(o['fps_median'] for o in offs),
+          '| pass', on['filter_share'] < 0.01 and on['fps_median'] >= 0.9 * min(o['fps_median'] for o in offs))
+    print('(c) enters within 0.5 to 1.5 x the off runs mean', mean_off, ':', 0.5 * mean_off <= on['enters'] <= 1.5 * mean_off)
+    print('fact, not scored: on enters inside the off runs range:', min(o['enters'] for o in offs) <= on['enters'] <= max(o['enters'] for o in offs))" && cd ..
+# the replay's share, set beside the on run's for scale: contain090_same on MTID's saved detections at conf 0.1
+cd harness && python -c "
+from replay.detections import read_detections; from replay.secondbox import contained
+d = read_detections('runs/dets.agnostic.jsonl'); k = contained(d, 0.9, same_class=True)
+print('replay, MTID, contain090_same at conf 0.1: detections', len(d), '| dropped', len(d) - len(k), '| share', round((len(d) - len(k)) / len(d), 4))" && cd ..
 ```
 
 ## Citation
