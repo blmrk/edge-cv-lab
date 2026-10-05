@@ -22,10 +22,11 @@ services:
 
   emqx:
     image: emqx/emqx:5.8
-    ports: ["18083:18083"]  # dashboard: admin / public
+    ports: ["${LAB_BIND:-127.0.0.1}:18083:18083"]  # dashboard + REST API; management ports bind LAB_BIND, 0.0.0.0: every interface
     environment:  # keep ingest's session and its queued events on disk across a broker restart
       EMQX_DURABLE_SESSIONS__ENABLE: "${DURABLE_SESSIONS:-true}"  # false: the broker-restart failure, for a before run
       EMQX_CLUSTER__DISCOVERY_STRATEGY: singleton  # required by the local durable storage backend
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: "${EMQX_DASHBOARD_PASSWORD:-public}"  # user admin; set on first boot only, make down to change
     healthcheck:
       test: ["CMD", "emqx", "ctl", "status"]
       interval: 5s
@@ -35,7 +36,7 @@ services:
   toxiproxy:  # the "cellular uplink": edge talks to the broker only through here
     image: ghcr.io/shopify/toxiproxy:2.9.0
     depends_on: { emqx: { condition: service_healthy } }
-    ports: ["8474:8474"]
+    ports: ["${LAB_BIND:-127.0.0.1}:8474:8474"]  # API, no auth: chaos/scenarios.sh
     volumes: ["./chaos/toxiproxy.json:/config/toxiproxy.json:ro"]
     command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
     restart: unless-stopped
@@ -43,7 +44,7 @@ services:
   postgres:
     image: postgres:16-alpine
     environment: { POSTGRES_PASSWORD: lab, POSTGRES_DB: lab }
-    ports: ["5432:5432"]
+    ports: ["${LAB_BIND:-127.0.0.1}:5432:5432"]
     restart: unless-stopped
 
   ingest:
@@ -83,7 +84,7 @@ services:
     image: grafana/grafana-oss:11.2.0
     depends_on: [postgres]
     restart: unless-stopped
-    ports: ["${GRAFANA_PORT:-3000}:3000"]  # GRAFANA_PORT=3001 make up when 3000 is taken
+    ports: ["${LAB_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"]  # GRAFANA_PORT=3001 make up when 3000 is taken
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
