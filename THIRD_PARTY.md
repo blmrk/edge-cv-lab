@@ -14,7 +14,7 @@ comes from that `METADATA` field. Copyleft licences are in **bold**.
 | Component | Version | Licence | Source | Shipping it commercially |
 |---|---|---|---|---|
 | `ultralytics` | 8.4.170, pinned (`services/edge/requirements.txt:1`) | **AGPL-3.0**, or the vendor's paid Enterprise licence | `pip show` (`AGPL-3.0`); classifier says "v3 or later", the `licenses/LICENSE` text is plain GNU AGPL v3; `METADATA:163`, `:406-411` state the dual licence and that the Enterprise licence covers software and AI models | Imported by the edge service in one process with our code. Distributing the image conveys `ultralytics` itself under AGPL-3.0 (s.4-6). Whether the combined program is a work based on it (s.0), and so under AGPL-3.0 as a whole, is a legal reading, not licence text. The network clause (s.13) covers a modified version that supports remote interaction; the edge program only publishes MQTT. The vendor offers its Enterprise licence for commercial use, including internal tools and production deployments (`METADATA:163`, `:411`). Take advice |
-| `yolov8n.pt` weights | `/app/yolov8n.pt`, 6549796 bytes, fetched at build time (`services/edge/Dockerfile:10`), no checksum | **AGPL-3.0** | the checkpoint's own metadata (`yolov8n/data.pkl`, read without unpickling): `'license': 'AGPL-3.0 License (https://ultralytics.com/license)'`. The package writes the same string into every checkpoint it saves or exports. The licence file of the assets repository was not read | Treat as AGPL-3.0 unless you hold the Enterprise licence. Never committed (`.gitignore:10`) |
+| `yolov8n.pt` weights | `/app/yolov8n.pt`, 6549796 bytes, fetched at build time and checked against a pinned sha256 (`services/edge/Dockerfile:11-12`) | **AGPL-3.0** | the checkpoint's own metadata (`yolov8n/data.pkl`, read without unpickling): `'license': 'AGPL-3.0 License (https://ultralytics.com/license)'`. The package writes the same string into every checkpoint it saves or exports. The licence file of the assets repository was not read | Treat as AGPL-3.0 unless you hold the Enterprise licence. Never committed (`.gitignore:10`) |
 | `ultralytics-platform` | 0.1.80 (required by `ultralytics`) | **AGPL-3.0-only** | `METADATA` License-Expression; `licenses/LICENSE` is GNU AGPL v3 | As `ultralytics` |
 | `ultralytics-thop` | 2.2.2 (required by `ultralytics`) | **AGPL-3.0** | `pip show`; `licenses/LICENSE` is GNU AGPL v3 | As `ultralytics` |
 | `torch` | 2.14.1+cpu, pinned (`services/edge/Dockerfile:7`) | Apache-2.0 AND Apache-2.0 WITH LLVM-exception AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT | `METADATA` License-Expression; `licenses/LICENSE` and about 90 `third_party/*/LICENSE` files | Permissive; keep the notices. BSL-1.0 is the Boost Software License (`third_party/sleef`), not the Business Source License. No GPL, LGPL, AGPL, MPL or EPL text in its third-party licence files, but `torch/lib` bundles `libgfortran`, `libgomp` and OpenBLAS, which none of them names (see the bundled-libraries row) |
@@ -80,9 +80,9 @@ Each runs as its own container, unmodified. None is linked into our code.
 | mediamtx | `bluenviron/mediamtx:latest` (`:8`, unpinned) | MIT | https://github.com/bluenviron/mediamtx (LICENSE), the project's repository; image labels empty | Permissive |
 | camera | `linuxserver/ffmpeg:latest` (`:13`, unpinned; 9.0-cli-ls83 locally) | **GPL-3.0-only** | image label `org.opencontainers.image.licenses` | GPL-3.0 terms if you distribute the image. Whether its FFmpeg build enables nonfree codecs was not verified |
 | emqx | `emqx/emqx:5.8` (`:24`; 5.8.6 locally) | Apache-2.0 | image labels `licenses=Apache-2.0`, `edition=Opensource` | Permissive. Per the project's announcements (not read from an image), 5.9.0 and later ship under the **Business Source License 1.1**: an upgrade past 5.8 changes the licence |
-| toxiproxy | `ghcr.io/shopify/toxiproxy:2.9.0` (`:36`) | MIT | image label | Permissive |
-| postgres | `postgres:16-alpine` (`:44`) | PostgreSQL License (server); MIT (image packaging); Alpine base packages under their own licences, for example busybox **GPL-2.0-only**, bash and readline **GPL-3.0-or-later** | https://www.postgresql.org/about/licence/ and https://github.com/docker-library/postgres (LICENSE), the projects' repositories, not read from the image; image labels empty; Alpine package licences from the image's `/lib/apk/db/installed` (`L:` field) | Permissive server; the base packages' licences travel with the image |
-| grafana | `grafana/grafana-oss:11.2.0` (`:83`) | **AGPL-3.0-only** | https://github.com/grafana/grafana (LICENSE; relicensed from Apache-2.0 at v8.0), the project's repository | We supply only provisioning YAML and dashboard JSON and make no API calls. AGPL-3.0 terms if you modify it and offer it over a network, or distribute the image |
+| toxiproxy | `ghcr.io/shopify/toxiproxy:2.9.0` (`:37`) | MIT | image label | Permissive |
+| postgres | `postgres:16-alpine` (`:45`) | PostgreSQL License (server); MIT (image packaging); Alpine base packages under their own licences, for example busybox **GPL-2.0-only**, bash and readline **GPL-3.0-or-later** | https://www.postgresql.org/about/licence/ and https://github.com/docker-library/postgres (LICENSE), the projects' repositories, not read from the image; image labels empty; Alpine package licences from the image's `/lib/apk/db/installed` (`L:` field) | Permissive server; the base packages' licences travel with the image |
+| grafana | `grafana/grafana-oss:11.2.10-security-01` (`:85`) | **AGPL-3.0-only** | https://github.com/grafana/grafana (LICENSE; relicensed from Apache-2.0 at v8.0), the project's repository; the image's `/usr/share/grafana/LICENSE` is the AGPL-3.0 text; image labels hold only `maintainer` | We supply only provisioning YAML and dashboard JSON and make no API calls. AGPL-3.0 terms if you modify it and offer it over a network, or distribute the image |
 
 ## Datasets and footage
 
@@ -99,7 +99,7 @@ Every clip, with URL, author and licence, is logged in [media/SOURCES.md](media/
 Our files that import AGPL code:
 
 - `services/edge/src/main.py:15` imports `ultralytics` at module level, in the same process as `replay/`, which
-  `services/edge/Dockerfile:11` copies into the image. Its default model is `yolov8n.pt` (`:70`).
+  `services/edge/Dockerfile:18` copies into the image. Its default model is `yolov8n.pt` (`:70`).
 - `harness/replay/trackers/bytetrack.py:25-28` imports `ultralytics` lazily, inside `make()`. The edge reaches it
   through `replay.trackers.create` when `CONTAIN_SHARE` is above 0. `replay.phantoms` and `replay.secondbox` (whose
   baseline is ByteTrack, so they run in the edge image), `replay.compare` and `replay.track` reach it by tracker name
@@ -122,7 +122,7 @@ it. `torch` is never imported by our code; `services/edge/Dockerfile:7` installs
 ## LICENSE and NOTICE in built artifacts
 
 The builds here do not copy this repository's `LICENSE` or `NOTICE` into what they produce: the edge and sim images copy
-only `harness/replay` and their `src/` (`services/edge/Dockerfile:11-12`, `services/sim/Dockerfile:4-5`), the ingest
+only `harness/replay` and their `src/` (`services/edge/Dockerfile:18-19`, `services/sim/Dockerfile:4-5`), the ingest
 image only its `src/` (`services/ingest/Dockerfile:5`), and `harness/` holds neither file, so a wheel built from it
 carries no licence text. Apache-2.0 s.4(a) and s.4(d) require both with any redistribution, so anyone distributing a
 built image or wheel must include `LICENSE` and `NOTICE` themselves.
