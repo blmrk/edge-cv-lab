@@ -2,8 +2,9 @@
 
 > Status: baseline measured on one annotated public clip. The fix moved to second boxes: its design is declared under
 > Fix, its steps have been run, and by the declared rule contain090_same wins, measured in the replay harness only
-> (Results). Since 2026-10-05 the edge runs it opt-in (`CONTAIN_SHARE=0.9`, off by default), checked live on MTID only
-> (In the live service (opt-in)). Every measured figure comes from a command in Reproduce.
+> (Results). Since 2026-10-05 the edge runs it opt-in (`CONTAIN_SHARE=0.9`, off by default), checked live on MTID and
+> on the clip under study, MVI_40714 (In the live service (opt-in)). Every measured figure comes from a command in
+> Reproduce.
 
 ## Problem
 
@@ -1311,7 +1312,83 @@ stays merged, off by default.
 
 #### Results on MVI_40714
 
-TBD until the runs.
+Run on 2026-10-05 in the declared order, off1, on, off2, on one edge image. Every run was valid, so none was repeated.
+Every figure here comes from the check's commands at the end of Reproduce, run as one block: the looped replay and the
+replay-share command, which printed the lines declared above again; the ffprobe, sha256 and gate lines before the runs;
+the `docker image inspect` lines, which record the edge image ID in `runs/live-MVI_40714/image.before`, each
+`runs/live-MVI_40714/<run>.image` and `runs/live-MVI_40714/image.after`; the `docker inspect` lines, which record each
+run's camera command and edge env; and the analysis, which prints each run's figures and validity, then (a) to (d).
+MTID's figures here, its 88, 84 and 79 enters and the image ID it recorded, come from the live check's commands (Live
+results).
+
+Before any row is read:
+
+- the clip: sha256 `d1eeb1281746ed7e4ae470623c7fa2bf206746149ce63c4e1742ce40d7d77be2`; ffprobe prints `nb_frames=1180`
+  and `r_frame_rate=25/1`, the frame count and rate the window is declared on;
+- the gate: the image prints `8.4.170 2.14.1+cpu`, the declared Ultralytics and torch, and these `conf` lines from
+  `Model.predict` and `Model.track`:
+  `custom = {"conf": 0.25, "batch": 1, "save": is_cli, "mode": "predict", "rect": True, "embed": None}` and
+  `kwargs["conf"] = 0.1 if kwargs.get("conf") is None else kwargs["conf"]  # trackers need low-confidence input`.
+  `Model.track` sets `conf` to 0.1 when none is passed, so every gate check held and the runs went ahead;
+- the edge image ID before off1 and after off2, the same both times:
+  `sha256:13a4cf3cccea881b701390ba4d0c8d44f61082db3ee3d32f8cbf5e53b99d2a09`, the ID the MTID check recorded (Live
+  results);
+- the freeze: before off1 and after off2, the two `git` commands declared above (One image, and the freeze) print
+  nothing.
+
+| run | image ID (short) | valid | enters | enters / 12 (mean per loop) | exits | heartbeats in the span | median fps | dropped / dets | filter_ms share |
+|---|---|---|---|---|---|---|---|---|---|
+| off1 | 13a4cf3cccea | yes | 375 | 31.25 | 375 | 51 | 15.8 | – | – |
+| on | 13a4cf3cccea | yes | 323 | 26.92 | 323 | 50 | 14.9 | 17152 / 260550 (0.0658) | 0.00274 (1552.0 ms) |
+| off2 | 13a4cf3cccea | yes | 380 | 31.67 | 380 | 51 | 15.1 | – | – |
+
+The short image ID is the first 12 hex characters after `sha256:` in each run's recorded ID
+(`runs/live-MVI_40714/<run>.image`); all three equal the full ID above. enters / 12 is the mean per loop over the span,
+not a per-loop count: nothing live marks where one loop joins the next. The off path logs no `contain ts_ms=` line, so
+the off runs have no `dropped`, `dets` or `filter_ms` (the analysis prints 0 for each).
+
+**Validity.** The analysis prints `invalid: none` for off1, for on and for off2, and scores the valid run of each name:
+off1, on and off2. In each, the edge image ID equals the ones recorded before off1 and after off2; the camera command
+holds `/media/UA-DETRAC/MVI_40714.mp4`, and the edge env holds `ZONE_POLYGON=[[0,307],[603,307],[643,505],[0,505]]`,
+`CONTAIN_SHARE` 0 in off1 and off2 and 0.9 in on, `CONTAIN_SAME_CLASS=1`, `MIN_TRAVEL_PX=0`, `OCCUPANCY_GAUGE_MS=500`
+and `TRACKER=bytetrack.yaml`; the stored gauge samples reached S0 + 656400 ms (no TIMEOUT); the edge container's
+restart count is 0; the log holds exactly one startup line, `contain: off` in off1 and off2 and
+`contain: on share=0.9 same_class=1 conf=0.1 tracker=bytetrack.yaml` in on; no line contains `unresponsive`; the span
+holds at least 2 heartbeats, none more than 30 s after the one before; and `contain ts_ms=` lines appear in the on run
+only.
+
+**Pass**, on the on run:
+
+- (a) filter active: **pass**. `dropped` summed over the span is 17152, above 0, and no heartbeat line has `dropped`
+  above `dets`.
+- (b) throughput: **pass**. 1. `filter_ms` summed over the span is 1552.0 ms, 0.00274 of the span, under 0.01
+  (5664 ms). 2. Its median fps, 14.9, is at least 0.9 times the lower of the off runs' medians, off2's 15.1 (off1's is
+  15.8).
+- (c) gross harm: **pass**. Its 323 enters lie within 0.5 to 1.5 times the mean of off1's and off2's enters, 377.5.
+- (d) fewer enters on: **pass**. The three scored runs are valid and (a) to (c) pass, so (d) is decided. The on run's
+  323 enters lie below the lower off run's, off1's 375, by 52, and the two off runs differ by 5 (off2's 380); 52 is more
+  than 5.
+
+Reported, not scored:
+
+- enters / 12, the mean per loop over the span: off1 31.25, on 26.92, off2 31.67. The looped replay's enters per loop
+  (Basis for W: 35 at the baseline and 28 under contain090_same at every frame; 31 and 30 at the baseline and 28 under
+  contain090_same at every second frame) are set beside them for scale only and are not read against them.
+- The on run's enters within the off runs' range: no. Its 323 enters lie below off1's 375 and off2's 380.
+- The two terms of (d), 52 and 5 (above), as its terms only, not as a size of the filter's effect live.
+- The on run's `dropped` / `dets`, 17152 of 260550 (0.0658), set beside the replay's for scale only: contain090_same
+  on all of MVI_40714's saved detections at `conf` 0.1, unmasked, drops 2543 of 38485, 0.0661 (the replay-share
+  command). This is not the masked per-detection table under Results, and neither is scored against the other.
+- Exits, heartbeats in the span, the `filter_ms` share, the image ID, the versions and fps: above.
+
+**What this shows.** (a) to (c) pass, so (d) is decided, and it passes. On MVI_40714, on one image and on CPU, the on
+run logged fewer enters than either off run, by more than the two off runs differed: the direction the replay gives.
+The on path differs from the off path in more than the filter (`model.predict` at `conf` 0.1 and the replay's
+ByteTrack adapter, against `model.track`). On MTID, where the replay gives both the same counts, the on run logged 88
+enters against 84 and 79. Which enters the on run did not log, and whether they were second boxes, is not known live:
+the live frames are not aligned with the annotations. The difference between the on run and the off runs is read only
+through (d), as a direction beyond the off runs' difference, never as a size; beyond (a) to (d) the check makes no
+claim about the filter's effect on counts (What the check on MVI_40714 may claim).
 
 #### What the check on MVI_40714 may claim
 
@@ -1392,10 +1469,11 @@ TBD until the runs.
   box, which are not second boxes; contain090_same qualifies there with 1 extra enter.
 - The found set puts no time limit on a found enter: it is the vehicle's first matching enter whenever it commits,
   where the time match allows 2 s. A step that delays a vehicle's enter keeps that vehicle found.
-- The opt-in filter is checked live on MTID only (In the live service (opt-in)): three runs and a repeat of any invalid
-  one, one edge image, CPU. On MTID the replay gives contain090_same the baseline's counts (every frame, counter at its
-  defaults): 39 enters; by vehicle 20 found, 16 judged extra, 3 not judged (Results). So the check can show that the
-  opt-in path runs and does no gross harm, not that the fix carries over.
+- The opt-in filter is checked live on two clips (In the live service (opt-in)): on MTID, where the replay gives
+  contain090_same the baseline's counts, for running and gross harm only; on MVI_40714, where (d) asks only for the
+  direction beyond the off runs' difference, not its size. Three runs per clip and a repeat of any invalid one, one
+  edge image, CPU, and a libx264 re-encode of the clip that the edge reads at part of its frames. The window on
+  MVI_40714 assumes that one loop of the camera takes the clip's length in wall time, which was not measured there.
 
 ## Reproduce
 
@@ -1913,11 +1991,12 @@ for key in ('baseline', 'birth040'):
         b = [x for x in tr if x.track_id == 69]
         print('   track 69: frames', b[0].frame, 'to', b[-1].frame, '| its footpoint at most',
               round(max(math.dist(x.footpoint, b[0].footpoint) for x in b), 1), 'px from its start')" && cd ..
-# NOT RUN YET: the live check on the clip under study, UA-DETRAC MVI_40714, declared under On the clip under study (In the
-# live service (opt-in)), whose results stay TBD until the runs. Local only: the clip and its zone go to compose (VIDEO,
-# ZONE_POLYGON) on the make up-video line only, never exported. Its files go under harness/runs/live-MVI_40714 (gitignored);
-# harness/runs/live holds the MTID check's files and is not written. From the repo root, with nothing else running in
-# Docker, on a host that accepts no inbound connection to port 8554 from other machines.
+# RUN on 2026-10-05, off1, on, off2, no repeat: the live check on the clip under study, UA-DETRAC MVI_40714, declared
+# under On the clip under study (In the live service (opt-in)), whose figures are under Results on MVI_40714. Local
+# only: the clip and its zone go to compose (VIDEO, ZONE_POLYGON) on the make up-video line only, never exported. Its
+# files go under harness/runs/live-MVI_40714 (gitignored); harness/runs/live holds the MTID check's files and is not
+# written. From the repo root, with nothing else running in Docker, on a host that accepts no inbound connection to port
+# 8554 from other machines.
 # the declaration's replay figures, in the edge image: MVI_40714's saved detections looped as the camera loops the clip,
 # one replay ByteTrack tracker and one counter per run, counter.update only as the edge runs it (no flush); every frame,
 # then every second frame from the first and from the second; enters per loop in loops 2 to 7
