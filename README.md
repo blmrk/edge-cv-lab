@@ -96,6 +96,29 @@ make up-video        # RTSP loop -> YOLO + ByteTrack on CPU -> same pipeline
 # opt-in: CONTAIN_SHARE=0.9 make up-video drops second boxes before tracking (docs/case-study-straddles.md)
 ```
 
+**Real camera:**
+
+```bash
+CAMERA_URL='rtsp://camera.example/stream' make up-camera
+```
+
+MediaMTX pulls the camera over TCP and re-serves it as `cam1`, so the edge reads the same URL and Toxiproxy, ingest and
+the dashboard run as they do for a clip; the clip camera is not started, and `make up-camera` first removes one that
+`make up-video` left running (compose would leave it up, and it restart-loops against the pulled `cam1`). The switch is
+[`docker-compose.camera.yml`](docker-compose.camera.yml), which only `make up-camera` loads; without `CAMERA_URL`
+compose stops with a message. Single-quote the URL, on the shell line and in `.env`, or a `&` or `$` in it breaks the
+line or is expanded. Credentials go in the gitignored `.env` (`CAMERA_URL='rtsp://user:pass@camera.example/stream'`),
+not on the shell line (shell history keeps it), never in a compose file; `docker compose config` and `docker inspect`
+of the mediamtx container show them once set. `make up-camera` has not been run against a real camera: only its
+compose render and a MediaMTX-only start are checked. Draw the zone on that camera's frame in `tools/label.html`, from
+a few seconds of it saved under `media/` (once up,
+`ffmpeg -rtsp_transport tcp -i rtsp://localhost:8554/cam1 -t 10 -an -c copy media/cam.mp4`; an H.265 camera's mp4 may
+not play there, so if it does not, re-encode with `-c:v libx264` in place of `-c copy`), then rerun the same line with
+`ZONE_POLYGON='<polygon from zone.json>'`; until then the edge uses the default zone, which belongs to
+`media/sample.mp4`. Add `RTSP_BIND=127.0.0.1` to keep MediaMTX, and the camera's picture, off other hosts. A second
+camera would be `cam2` (`MTX_PATHS_CAM2_SOURCE`) and a second edge service reading it with its own `DEVICE_ID`; that
+is not wired up here.
+
 **Your own clip, end to end:**
 
 ```bash

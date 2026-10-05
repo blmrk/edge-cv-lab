@@ -1,4 +1,4 @@
-.PHONY: test fixtures visuals trackers footage up up-video down logs counts delivery drill broker-restart
+.PHONY: test fixtures visuals trackers footage up up-video up-camera down logs counts delivery drill broker-restart
 ALL = --profile sim --profile video
 Z = fixtures/zone.json
 T = fixtures/traffic.jsonl
@@ -31,6 +31,7 @@ footage:   ## tracker comparison over the real clip, not the fixture: docs/foota
 	      --start 20 --seconds 13 --crop 0 600 --every 3 --fps 10 --width 640 --out ../docs/footage/real-compare.gif
 up:        ; docker compose --profile sim up -d --build     # synthetic traffic, no video needed
 up-video:  ; docker compose --profile video up -d --build   # needs media/sample.mp4
+up-camera: ; docker compose --profile video rm -sf camera && docker compose -f docker-compose.yml -f docker-compose.camera.yml --profile video up -d --build  # needs CAMERA_URL (shell or .env); compose stops with a message without it
 down:      ; docker compose $(ALL) down -v
 logs:      ; docker compose $(ALL) logs -f sim edge ingest
 counts:    ; docker compose exec postgres psql -U postgres lab -c "select counter, kind, count(*) from zone_events group by 1,2 order by 1,2"

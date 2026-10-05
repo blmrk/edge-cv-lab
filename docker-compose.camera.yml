@@ -1,0 +1,15 @@
+# make up-camera: a real RTSP camera as cam1, layered on docker-compose.yml. Only that target loads this file, so
+# the default lab renders and runs as before. MediaMTX pulls $CAMERA_URL itself (MTX_PATHS_CAM1_* environment, no
+# config file) and re-serves it as rtsp://mediamtx:8554/cam1, the URL the edge already reads; the clip camera is not
+# started. Compose leaves a clip camera container still running from make up-video up, and it restart-loops against
+# the pulled cam1: make up-camera removes it first (docker compose --profile video rm -sf camera). A CAMERA_URL with
+# credentials goes in the gitignored .env, single-quoted, not on the shell line (shell history keeps it), never here.
+services:
+  mediamtx:
+    environment:
+      MTX_PATHS_CAM1_SOURCE: "${CAMERA_URL:?set CAMERA_URL, e.g. CAMERA_URL='rtsp://camera.example/stream' make up-camera}"
+      MTX_PATHS_CAM1_RTSPTRANSPORT: tcp  # pull over TCP, as the clip camera publishes: no UDP through Docker's NAT
+  camera:
+    profiles: !override [clip]  # out of the video profile: with a pulled source, nothing else may publish to cam1
+  edge:
+    depends_on: !override [mediamtx, toxiproxy]  # was [camera, toxiproxy]; the camera depended on mediamtx

@@ -28,4 +28,4 @@ with no cameras, no edge boxes and no GPU. Read HANDOVER.md for status and the t
 - `.cache/` (gitignored) holds external tools cloned at a pinned commit, e.g. TrackEval for `scripts/trackeval_run.py`.
 
 ## Commands
-`make test` `make fixtures` `make visuals` `make trackers` `make up` `make up-video` `make down` `make logs` `make counts` `make delivery` `make drill` `make broker-restart` `make footage`
+`make test` `make fixtures` `make visuals` `make trackers` `make up` `make up-video` `make up-camera` `make down` `make logs` `make counts` `make delivery` `make drill` `make broker-restart` `make footage`
