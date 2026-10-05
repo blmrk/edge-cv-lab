@@ -61,6 +61,8 @@ A fixed CCTV camera over a signalised intersection, 106.6 s, 14 labelled visits 
 
 ![two IoU trackers over the real clip (per-class NMS detections), IDs as coloured tags](docs/footage/real-compare.gif)
 
+What to watch: each time a tracker loses a vehicle, the vehicle comes back under a new ID, the churn the counting study measures and each header tallies as IDs used; the bottom tracker, with the shorter buffer, loses vehicles sooner and runs through IDs faster, and closes fewer visits because its fragments are often too short for the debounced counter to keep as visits. Per-class NMS can also put two boxes with two IDs on one vehicle, so the changing tags are the failure being shown, not a rendering fault ([docs/case-study-tracking.md](docs/case-study-tracking.md)).
+
 Footage: [MTID](https://vap.aau.dk/mtid/) (Multi-View Traffic Intersection Dataset) infrastructure camera by M. B. Jensen, A. Møgelmose and T. B. Moeslund, Aalborg University, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Frames re-encoded to video, cropped and resized, with tracking overlays added; rendered with `make footage`.
 
 Full write-up with real footage: [docs/case-study-tracking.md](docs/case-study-tracking.md).
