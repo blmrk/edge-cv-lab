@@ -1,12 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 Belmark Ray Nalugon (https://github.com/blmrk/edge-cv-lab)
-"""The fixed-camera GIF writer on tiny frames. Skipped where the [viz] extras are not installed (CI)."""
+"""The fixed-camera GIF writer on tiny frames, and per-run fixes over a tiny clip. Skipped where the [viz] extras are not
+installed (CI)."""
+import json
+import sys
+
 import pytest
 
 np = pytest.importorskip("numpy")
 cv2 = pytest.importorskip("cv2")
 Image = pytest.importorskip("PIL.Image")
 
+from replay import trackviz  # noqa: E402
 from replay.trackviz import W, draw_tag, overlay_rgba, save_fixed_camera_gif  # noqa: E402
 from replay.viz import draw_zone  # noqa: E402
 
@@ -175,3 +180,106 @@ def test_a_tag_whose_box_top_is_under_the_header_goes_just_below_it():
     assert tag_rows(100, 50)[0] == 100 + header       # box cut by the crop top
     assert tag_rows(0, header + 5)[0] == header       # top edge visible, but no room for the tag above it
     assert tag_rows(100, 50, width=1024)[0] == 100 + 32   # a 1024 px clip is scaled up to W: header 32 px here
+
+
+FRAMES = 30
+
+
+def scene(tmp_path, boxes):
+    """A 160 x 120 clip of FRAMES grey frames at 10 fps, a zone over most of it, and the same detections, (bbox, score)
+    of class car, on every frame. Returns the trackviz arguments for them."""
+    clip = str(tmp_path / "clip.avi")
+    out = cv2.VideoWriter(clip, cv2.VideoWriter_fourcc(*"MJPG"), 10, (160, 120))
+    for _ in range(FRAMES):
+        out.write(np.full((120, 160, 3), 90, np.uint8))
+    out.release()
+    (tmp_path / "dets.jsonl").write_text("".join(
+        json.dumps({"frame": f, "ts_ms": 100 * f, "bbox": bbox, "score": score, "cls": "car"}) + "\n"
+        for f in range(FRAMES) for bbox, score in boxes))
+    (tmp_path / "zone.json").write_text(json.dumps({"polygon": [[5, 5], [155, 5], [155, 115], [5, 115]]}))
+    return ["--video", clip, "--dets", str(tmp_path / "dets.jsonl"), "--zone", str(tmp_path / "zone.json"),
+            "--out", str(tmp_path / "out.gif"), "--width", "160"]
+
+
+def render(monkeypatch, capsys, *args) -> list[str]:
+    """trackviz's printed totals, one line per run."""
+    monkeypatch.setattr(sys, "argv", ["trackviz", *args])
+    trackviz.main()
+    return capsys.readouterr().out.splitlines()[:-1]  # the last line names the file written
+
+
+def fed(monkeypatch) -> list[list[int]]:
+    """Per tracker, in --trackers order: how many detections it was given on each frame."""
+    real, out = trackviz.create, []
+
+    def create(name, **params):
+        tracker, counts = real(name, **params), []
+        out.append(counts)
+
+        class Counting:
+            def update(self, f, ts, ds):
+                counts.append(len(ds))
+                return tracker.update(f, ts, ds)
+        return Counting()
+    monkeypatch.setattr(trackviz, "create", create)
+    return out
+
+
+def test_the_zone_rule_is_per_run(tmp_path, monkeypatch, capsys):
+    # a box that never moves, inside the zone: a lane marking scored as a car. The run without the rule counts it
+    args = scene(tmp_path, [([60, 40, 100, 80], 0.9)])
+    assert render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "greedy_iou", "--min-travel-px", "0", "30") \
+        == ["greedy_iou: IDs 1, visits closed 1", "greedy_iou + zone rule 30 px: IDs 1, visits closed 0"]
+
+
+@pytest.mark.parametrize("filtered_run", [0, 1])     # either order: a run's filtered frame must not leak to the next
+def test_the_second_box_filter_is_per_run_and_before_the_tracker(tmp_path, monkeypatch, capsys, filtered_run):
+    # a car box with a lower-scoring car box wholly inside it, on every frame: a second box on one vehicle
+    args = scene(tmp_path, [([40, 30, 120, 90], 0.9), ([50, 40, 80, 70], 0.5)])
+    given = fed(monkeypatch)
+    filters = ["none", "none"]
+    filters[filtered_run] = "contain090_same"
+    lines = render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "greedy_iou",
+                   "--labels", "a", "b", "--filters", *filters)
+    seen = [[2] * FRAMES, [2] * FRAMES]
+    seen[filtered_run] = [1] * FRAMES
+    assert given == seen                                # only the filtered run's tracker misses the inner box
+    said = ["a: IDs 2, visits closed 2", "b: IDs 2, visits closed 2"]
+    said[filtered_run] = "ab"[filtered_run] + " + contain090_same: IDs 1, visits closed 1"
+    assert lines == said
+
+
+def test_without_the_new_options_runs_are_as_before(tmp_path, monkeypatch, capsys):
+    args = scene(tmp_path, [([40, 30, 120, 90], 0.9), ([50, 40, 80, 70], 0.5)])
+    given = fed(monkeypatch)
+    assert render(monkeypatch, capsys, *args, "--trackers", "greedy_iou") == ["greedy_iou: IDs 2, visits closed 2"]
+    assert given == [[2] * FRAMES]
+
+
+def test_both_fixes_on_one_run_are_both_named(tmp_path, monkeypatch, capsys):
+    args = scene(tmp_path, [([40, 30, 120, 90], 0.9), ([50, 40, 80, 70], 0.5)])
+    assert render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "--labels", "IoU",
+                  "--filters", "contain090_same", "--min-travel-px", "30") \
+        == ["IoU + contain090_same + zone rule 30 px: IDs 1, visits closed 0"]
+
+
+@pytest.mark.parametrize("extra, said", [
+    (["--filters", "contain090_same"], ["--filters: 1 given for 2 trackers", "none for no filter"]),
+    (["--min-travel-px", "30"], ["--min-travel-px: 1 given for 2 trackers", "0 for off"]),
+    (["--filters", "none", "contain09"], ["--filters", "contain09", "contain090_same"]),   # names the known filters
+])
+def test_run_options_that_do_not_fit_stop_with_a_clear_message(tmp_path, monkeypatch, capsys, extra, said):
+    args = scene(tmp_path, [([60, 40, 100, 80], 0.9)])
+    with pytest.raises(SystemExit) as stop:
+        render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "bytetrack", *extra)
+    assert stop.value.code == 2
+    err = capsys.readouterr().err
+    assert all(s in err for s in said), err
+
+
+def test_a_label_too_long_for_the_header_shrinks_to_end_before_the_stats():
+    # the stats start at x=470; a label naming its fixes can run past that
+    long = "bytetrack + contain090_same + zone rule 30 px"
+    width = cv2.getTextSize(long, cv2.FONT_HERSHEY_SIMPLEX, trackviz.label_scale(long), 2)[0][0]
+    assert 16 + width < 470
+    assert trackviz.label_scale("greedy_iou:max_age=5, 0.17 s buffer") == 0.8   # the labels that fit are unchanged

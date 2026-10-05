@@ -1,4 +1,4 @@
-.PHONY: test fixtures visuals trackers footage up up-video up-camera down logs counts delivery drill broker-restart
+.PHONY: test fixtures visuals trackers footage footage-after up up-video up-camera down logs counts delivery drill broker-restart
 ALL = --profile sim --profile video
 Z = fixtures/zone.json
 T = fixtures/traffic.jsonl
@@ -29,6 +29,14 @@ footage:   ## tracker comparison over the real clip, not the fixture: docs/foota
 	      --trackers greedy_iou "greedy_iou:max_age=5" \
 	      --labels "greedy_iou, 1 s buffer" "greedy_iou:max_age=5, 0.17 s buffer" \
 	      --start 20 --seconds 13 --crop 0 600 --every 3 --fps 10 --width 640 --out ../docs/footage/real-compare.gif
+# footage-after: same window, crop and size, on the class-agnostic NMS detections harness/runs/dets.agnostic.jsonl
+# (gitignored; docs/case-study-phantoms.md, Reproduce). Runs in the edge image, which has ultralytics for bytetrack.
+footage-after: ## short-buffer tracker vs ByteTrack with the studies' fixes over the real clip: docs/footage/real-after.gif
+	docker run --rm --network none -v "$(CURDIR)":/work -w /work/harness edge-cv-lab-edge python -m replay.trackviz \
+	  --video ../media/sample.mp4 --dets runs/dets.agnostic.jsonl --zone zone.json \
+	  --trackers "greedy_iou:max_age=5" bytetrack --labels "greedy_iou:max_age=5, 0.17 s buffer" bytetrack \
+	  --filters none contain090_same --min-travel-px 0 30 \
+	  --start 20 --seconds 13 --crop 0 600 --every 3 --fps 10 --width 640 --out ../docs/footage/real-after.gif
 up:        ; docker compose --profile sim up -d --build     # synthetic traffic, no video needed
 up-video:  ; docker compose --profile video up -d --build   # needs media/sample.mp4
 up-camera: ; docker compose --profile video rm -sf camera && docker compose -f docker-compose.yml -f docker-compose.camera.yml --profile video up -d --build  # needs CAMERA_URL (shell or .env); compose stops with a message without it

@@ -12,6 +12,10 @@ python -m replay.trackviz --dets fixtures/queue.dets.jsonl --gt fixtures/queue.g
 Over real footage: --video draws each frame on the matching frame of the clip the detections came from (frame f is
 the (f+1)-th frame read, as dump_detections numbers them), and --start/--seconds render a window of it. Trackers
 still run from the first frame, so IDs match a full run; the strip counters start at the window.
+
+Fixes per run, one value per tracker in --trackers order: --filters drops detections before that run's tracker (none,
+or a second-box filter of replay.secondbox such as contain090_same), --min-travel-px sets that run's zone rule (0: off).
+A run's label is followed by what was applied: "bytetrack + contain090_same + zone rule 30 px".
 """
 from __future__ import annotations
 
@@ -22,6 +26,7 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
+from . import secondbox
 from .detections import frame_window, frames, read_detections
 from .schema import read_tracks
 from .trackers import create
@@ -29,6 +34,12 @@ from .viz import BG, FONT, LINE, ROAD, TEXT, ZONE_C, _palette, draw_zone
 
 W = 1280
 TAG_COLOURS = 24  # over footage, ID colours cycle through this many hues so each gets an exact GIF palette entry
+FILTERS = {k: keep for k, _, _, keep, _ in secondbox.STEPS if k.startswith("contain")}  # frame-local: run per frame
+
+
+def label_scale(label: str) -> float:
+    """Font scale of a strip's header label: 0.8, or less for a label that would run into the stats at x=470."""
+    return min(0.8, 0.8 * 440 / max(cv2.getTextSize(label, FONT, 0.8, 2)[0][0], 1))
 
 
 class _Clip:
@@ -163,7 +174,18 @@ def main():
     ap.add_argument("--every", type=int, default=2, help="render every Nth frame")
     ap.add_argument("--fps", type=int, default=12)
     ap.add_argument("--width", type=int, default=960)
+    ap.add_argument("--filters", nargs="+", choices=["none", *FILTERS],
+                    help="detection filter per tracker, same order as --trackers, applied before it (default: none)")
+    ap.add_argument("--min-travel-px", nargs="+", type=float,
+                    help="zone rule per tracker, same order as --trackers: an enter waits until the track has moved "
+                         "this far (default: 0, off)")
     a = ap.parse_args()
+    n = len(a.trackers)
+    for flag, given, off in (("--filters", a.filters, "none for no filter"),
+                             ("--min-travel-px", a.min_travel_px, "0 for off")):
+        if given is not None and len(given) != n:
+            ap.error(f"{flag}: {len(given)} given for {n} trackers; give one per tracker, {off}")
+    filters, travel = a.filters or ["none"] * n, a.min_travel_px or [0] * n
 
     from .zones import DebouncedZoneCounter
 
@@ -177,8 +199,10 @@ def main():
     for i, spec in enumerate(a.trackers):
         name, _, raw = spec.partition(":")
         params = {k: json.loads(v) for k, v in (kv.split("=", 1) for kv in raw.split(",") if kv)}
-        runs.append({"label": (a.labels or a.trackers)[i], "tracker": create(name, **params),
-                     "counter": DebouncedZoneCounter(poly), "ids": set(), "closed": 0})
+        fixes = [filters[i]] * (filters[i] != "none") + [f"zone rule {travel[i]:g} px"] * bool(travel[i])
+        label = " + ".join([(a.labels or a.trackers)[i], *fixes])
+        runs.append({"label": label, "tracker": create(name, **params), "keep": FILTERS.get(filters[i]),
+                     "counter": DebouncedZoneCounter(poly, min_travel_px=travel[i]), "ids": set(), "closed": 0})
 
     stamps = {d.frame: d.ts_ms for d in dets}
     first, last = min(stamps), max(stamps)
@@ -215,7 +239,7 @@ def main():
         if footage:
             cv2.putText(strip, f"{ts / 1000:5.1f} s", (W - 130, strip.shape[0] - 16), FONT, 0.8, TEXT, 2, cv2.LINE_AA)
         cv2.rectangle(strip, (0, 0), (W, 40), (0, 0, 0), -1)
-        cv2.putText(strip, r["label"], (16, 28), FONT, 0.8, TEXT, 2, cv2.LINE_AA)
+        cv2.putText(strip, r["label"], (16, 28), FONT, label_scale(r["label"]), TEXT, 2, cv2.LINE_AA)
         stats = f"IDs used {len(r['ids'])}    visits closed {r['closed']}"
         cv2.putText(strip, stats, (470, 28), FONT, 0.7, TEXT, 1, cv2.LINE_AA)
         for tid, secs in r["counter"].open_visits(ts)[:1]:
@@ -232,7 +256,7 @@ def main():
         shown = f >= f0 and ((f - phase) % a.every == 0 or f == f1)
         bg = clip.frame(f) if clip and shown else None
         for r in runs:
-            boxes = r["tracker"].update(f, ts, ds)
+            boxes = r["tracker"].update(f, ts, r["keep"](ds) if r["keep"] else ds)
             for b in boxes:
                 exits = sum(1 for e in r["counter"].update(b) if e.kind == "exit")
                 if f >= f0:                                           # counters start at the window
