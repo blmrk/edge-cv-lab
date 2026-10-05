@@ -1065,6 +1065,196 @@ enters is measured in the replay harness only (What the live check may claim).
 - The live figures are read through (a) to (c) only; beyond them the check makes no claim about the filter's effect on
   counts.
 
+### On the clip under study
+
+On MTID the replay gives contain090_same the baseline's counts, so the check above can ask only whether the opt-in
+path runs and does no gross harm. On the clip under study, UA-DETRAC MVI_40714, the replay gives the filter an effect:
+35 enters at the baseline and 28 under contain090_same (one pass, every frame, counter at its defaults), and by vehicle
+6 of the 8 second-box enters removed and none added (Results). This part declares a live check on that clip, streamed
+locally through MediaMTX, before any run of it. The MTID check's text above was declared and published before this
+check and stays as published; its statement that the live edge has not run on a clip where the filter removes an enter
+(What the live check may claim) holds until this check's runs.
+
+#### Declared before any run on MVI_40714
+
+This part was committed before any live run on MVI_40714, and no run result changes it. Its thresholds, windows, run
+settings and loop count are declared parameters, not measurements. The analysis is the check's last `python -c` block
+in Reproduce, committed with this declaration, before off1; it does not change until the results are published, and a
+change after any run is its own labelled commit, with both outputs reported.
+
+**Runs.** Three runs on MVI_40714, in the order off1, on, off2, so that drift over the session falls on both sides of
+the on run. Each run is `make down`, then `make up-video` with these values set inline on the make line only, never
+exported:
+
+- `VIDEO=UA-DETRAC/MVI_40714.mp4` and `ZONE_POLYGON='[[0,307],[603,307],[643,505],[0,505]]'`, the polygon of
+  `runs/MVI_40714.zone.json` (written in Reproduce). Compose takes the camera's clip and the edge's zone from these two;
+  unset, they are `media/sample.mp4` and the MTID polygon, as before;
+- `CONTAIN_SHARE` 0, 0.9 and 0 in turn;
+- `OCCUPANCY_GAUGE_MS=500`, the run clock (the window below starts at its first stored sample);
+- `GRAFANA_PORT=3001` and `RTSP_BIND=127.0.0.1` (Local only, below).
+
+Everything else stays at compose's defaults: `CONTAIN_SAME_CLASS=1`, `MIN_TRAVEL_PX=0`, `TRACKER=bytetrack.yaml`.
+`make down` removes the containers and their logs, so each run's figures and log are saved before the next run starts.
+
+**Files.** Every file of this check goes under `harness/runs/live-MVI_40714/` (gitignored): `image.before`,
+`image.after` and, per run, `<run>.image`, `.camera`, `.edge.env`, `.fps`, `.span`, `.events`, `.restarts` and
+`.edge.log`. Nothing is written to `harness/runs/live/`, which holds the MTID check's files. A repeat is `<run>.2` in
+the same directory.
+
+**One image, and the freeze.** The edge image is built once, before off1 (`docker compose --profile video build edge`),
+and its ID is recorded before off1, at each run and after the last run; `make up-video` builds every time, so a run is
+valid only if its ID equals the one before off1 and the one after the last run (below). Nothing under `services/edge`,
+`harness/replay` or `docker-compose.yml` changes from this declaration's commit until the last run ends (off2, or a
+repeat after it). Before off1 and again after the last run, both of these print nothing:
+`git status --porcelain -- services/edge harness/replay docker-compose.yml` and
+`git diff --stat <this declaration's commit> HEAD -- services/edge harness/replay docker-compose.yml`. No other build or
+container runs in Docker alongside the lab.
+
+**Gate, before the first run.** The runs do not start unless all of these hold:
+
+- ffprobe prints `nb_frames=1180` and `r_frame_rate=25/1` for `media/UA-DETRAC/MVI_40714.mp4`, the frame count and
+  rate the window is declared on;
+- the image reports Ultralytics 8.4.170 and torch 2.14.1+cpu, the versions the replay ran on (Results);
+- `Model.track`'s source in the image sets `conf` to 0.1 when none is passed, so that the on path's `conf` 0.1 equals
+  the off path's.
+
+The clip's sha256 is recorded (the `shasum` line in Reproduce).
+
+**Local only.** MediaMTX's 8554 is published on every host interface unless `RTSP_BIND` is set; `RTSP_BIND=127.0.0.1`
+is set on every run, so the stream is published on the host's loopback only. The edge reads it inside the compose
+network (`rtsp://mediamtx:8554/cam1`) and does not use the host port. UA-DETRAC is used for metrics only
+(`media/SOURCES.md`): no frame, screenshot or Grafana capture is taken.
+
+**Window, the same for every run.**
+
+- One loop of the clip, L, is 1180 frames at 25 fps (the clip's; the ffprobe line in Reproduce prints both), so
+  47200 ms.
+- W, the number of whole loops counted, is 12, so the span is 566400 ms long.
+- S0 is the run's first stored gauge sample, the least `zone_occupancy.ts_ms` for edge-01.
+- T0 = S0 + 30000 ms, which skips the vehicles already in the zone when the edge joins the loop.
+- The counted span is [T0, T0 + 566400 ms): twelve whole loops, so each run counts every part of the clip twelve
+  times, wherever in the loop it joined.
+- A run is read once its stored gauge samples reach S0 + 656400 ms: the 30 s skip, the span and a 60 s margin, the
+  margin because an enter is stored only with its exit. The wait polls about every 10 s and gives up after 90 polls
+  (TIMEOUT).
+- Only the total over the 12 loops is read. Nothing live marks where one loop joins the next, so enters / 12 is
+  reported as the mean per loop over the span, never as a per-loop count.
+
+**Basis for W.** The looped replay in Reproduce feeds MVI_40714's saved detections in the edge image as the camera
+loops the clip, to one replay ByteTrack tracker and one counter per run, updated as the edge updates them (no flush at
+the end): every frame, then every second frame from the first and from the second. It prints the enters per loop in
+loops 2 to 7:
+
+```
+looped replay, every 1 frame(s) from frame 0 | enters per loop, loops 2 to 7: baseline [35, 35, 35, 35, 35, 35] | contain090_same [28, 28, 28, 28, 28, 28]
+looped replay, every 2 frame(s) from frame 0 | enters per loop, loops 2 to 7: baseline [31, 31, 31, 31, 31, 31] | contain090_same [28, 28, 28, 28, 28, 28]
+looped replay, every 2 frame(s) from frame 1 | enters per loop, loops 2 to 7: baseline [30, 30, 30, 30, 30, 30] | contain090_same [28, 28, 28, 28, 28, 28]
+```
+
+The gap between the baseline and contain090_same is much smaller at every second frame than at every frame, and the
+live edge infers on part of the stream's frames only (on MTID its median fps was 14.2 to 14.8 against the clip's 30,
+Live results). So W is set at 12, which keeps the read point, S0 + 656.4 s, plus the lab's startup well inside the
+wait (90 polls about 10 s apart).
+
+**Measures.** As on MTID:
+
+- Enters and exits: `zone_events` rows for edge-01, counter `debounced`, with `ts_ms` in the span.
+- fps: the median of the `device_status` polls, deduplicated by `updated_at`, whose `updated_at` falls in the span.
+- The filter's figures: the on run's `contain ts_ms=` lines with `ts_ms` in the span.
+- New: per run, `docker inspect` records the camera container's `.Config.Cmd` (`<run>.camera`) and the edge
+  container's `.Config.Env` (`<run>.edge.env`) as JSON. The edge's log names neither the clip nor the zone, so these
+  are what tells which clip, zone and flags a run used.
+
+**A valid run** meets all of these:
+
+- its edge image ID equals the ones recorded before off1 and after the last run;
+- it ran with the clip, zone and flags as set: its camera command holds the element `/media/UA-DETRAC/MVI_40714.mp4`;
+  its edge env holds `ZONE_POLYGON` equal to `runs/MVI_40714.zone.json`'s polygon, serialised as JSON with separators
+  `(',', ':')`; `CONTAIN_SHARE` is 0.9 on the on run and 0 on the others; and `CONTAIN_SAME_CLASS=1`,
+  `MIN_TRAVEL_PX=0`, `OCCUPANCY_GAUGE_MS=500` and `TRACKER=bytetrack.yaml`;
+- its stored gauge samples reached S0 + 656400 ms (no TIMEOUT);
+- the edge container's restart count is 0;
+- its saved log holds exactly one `contain: ` startup line, the one its flags should print;
+- no log line contains `unresponsive`;
+- it has at least 2 heartbeats in the span, consecutive ones at most 30 s apart;
+- it logs `contain ts_ms=` lines if and only if it is the on run.
+
+Every run is reported, invalid ones included. Validity never depends on enters, fps or drops. An invalid run is
+repeated once, right away, as `<run>.2` with the same settings (`RUNS=<run>.2` in Reproduce, from the `q()` line, never
+from the build line, which would overwrite `image.before`). (a) to (d), and the off runs' figures, use the valid run of
+each name. If the repeat is invalid too, the check is reported as not completed and (d) as not decided. No setting,
+threshold or window changes because of a result.
+
+**Pass**, declared now, on the on run:
+
+- (a) Filter active: `dropped` summed over the span is above 0, and no heartbeat line has `dropped` above `dets`.
+- (b) Throughput: both of these must hold.
+  1. `filter_ms` summed over the span is under 0.01 of the span (5664 ms).
+  2. Its median fps is at least 0.9 times the lower of the two off runs' medians.
+- (c) Gross harm: its enters lie within 0.5 to 1.5 times the mean of off1's and off2's enters.
+- (d) Fewer enters on, the scored claim of this check. It is decided only when the three scored runs are valid and (a),
+  (b) and (c) all pass; otherwise the result is "(d) not decided", naming what failed, since a broken on path or a
+  slower one would log fewer enters for reasons other than the filter. It passes if and only if
+  `min(off1, off2) - on > |off1 - off2|`, in enters: the on run's enters are below the lower off run's by more than the
+  two off runs differ from each other. This implies the on run is below both.
+
+**Basis for (d).**
+
+- On MTID, where the replay gives contain090_same the baseline's counts, the on run's 88 enters lay above both off
+  runs' 84 and 79 (Live results). So a run that changes nothing can land outside the off runs' range, and "below both"
+  alone is not enough.
+- The off runs' own difference is the only measure of run-to-run spread on this clip that the check has.
+- A fixed margin taken from MTID was not used: MTID is another clip, and the looped replay gives a small gap at every
+  second frame.
+
+Reported, not scored:
+
+- enters / 12 per run, the mean per loop over the span, set beside the looped replay's per-loop enters for scale only
+  and never read against them;
+- whether the on run's enters lie within the off runs' range;
+- the two terms of (d), as its terms only, when (d) is decided;
+- the on run's `dropped` / `dets`, set beside the replay's for scale only: contain090_same on all of MVI_40714's saved
+  detections at `conf` 0.1, unmasked, as the edge sees them. The replay-share command in Reproduce prints
+  `replay, MVI_40714, contain090_same at conf 0.1: detections 38485 | dropped 2543 | share 0.0661`. This is not the
+  masked per-detection table under Results, and neither is scored against the other;
+- exits, heartbeats in the span, the `filter_ms` share, the image ID, the versions and fps.
+
+A fail in (a), (b) or (c) is published as a fail. A fail or a not-decided in (d) is published as such. The opt-in code
+stays merged, off by default.
+
+#### Results on MVI_40714
+
+TBD until the runs.
+
+#### What the check on MVI_40714 may claim
+
+- What it asks of the replay. The replay gives MVI_40714 35 enters at the baseline and 28 under contain090_same (one
+  pass, every frame, counter at its defaults). By vehicle, 6 of the 8 second-box enters are removed and none added
+  (Results). The live check asks one thing of that: does the on run log fewer enters than both off runs, by more than
+  they differ?
+- A (d) pass is written only as: "On MVI_40714, on one image and on CPU, the on run logged fewer enters than either off
+  run, by more than the two off runs differed: the direction the replay gives." It is followed by: "The on path differs
+  from the off path in more than the filter (`model.predict` at `conf` 0.1 and the replay's ByteTrack adapter, against
+  `model.track`). On MTID, where the replay gives both the same counts, the on run logged 88 enters against 84 and 79."
+  and by: "Which enters the on run did not log, and whether they were second boxes, is not known live: the live frames
+  are not aligned with the annotations."
+- A (d) fail is written as: "On MVI_40714 the on run did not log fewer enters than both off runs by more than they
+  differed. This does not show that the filter has no effect live, nor that the replay result is wrong; its effect on
+  enters is measured in the replay harness only."
+- (d) not decided is written as: "(d) not decided: <what failed>."
+- None of these is written:
+  - the off runs' enters less the on run's, or their ratio, as enters or a share the filter removed live;
+  - a per-loop count;
+  - enters / 12 against the looped replay's figures as a match or a shortfall;
+  - any comparison of a live difference with the replay's difference per pass or with the every-second-frame figures;
+  - an expected live fps;
+  - a count of second-box enters removed live, or a rate;
+  - "the fix carries over", "works live", "verified", "no effect" or "no harm" beyond (a) to (d).
+- What the live check may claim (MTID, above) carries over, with three changes: the share of the stream's frames the
+  live edge infers on is the run's median fps over the clip's 25; a difference between the on run and the off runs is
+  read only through (d), as a direction beyond the off runs' difference, never as a size; and the live figures are read
+  through (a) to (d) only, where MTID's line reads (a) to (c) only.
+
 ## Limitations
 
 - One clip, one detector, one camera, 47.2 s, 27 visits. The headline figure rests on a single enter, and that enter's
@@ -1614,6 +1804,142 @@ else
   done
   cd ..
 fi
+# NOT RUN YET: the live check on the clip under study, UA-DETRAC MVI_40714, declared under On the clip under study (In the
+# live service (opt-in)), whose results stay TBD until the runs. Local only: the clip and its zone go to compose (VIDEO,
+# ZONE_POLYGON) on the make up-video line only, never exported. Its files go under harness/runs/live-MVI_40714 (gitignored);
+# harness/runs/live holds the MTID check's files and is not written. From the repo root, with nothing else running in
+# Docker, on a host that accepts no inbound connection to port 8554 from other machines.
+# the declaration's replay figures, in the edge image: MVI_40714's saved detections looped as the camera loops the clip,
+# one replay ByteTrack tracker and one counter per run, counter.update only as the edge runs it (no flush); every frame,
+# then every second frame from the first and from the second; enters per loop in loops 2 to 7
+docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD":/work -w /work/harness edge-cv-lab-edge python -c "
+import json
+from collections import defaultdict
+from replay.detections import Detection, read_detections
+from replay.secondbox import contained
+from replay.trackers import create
+from replay.zones import DebouncedZoneCounter
+Z = [tuple(p) for p in json.load(open('runs/MVI_40714.zone.json'))['polygon']]
+by = defaultdict(list)
+for d in read_detections('runs/MVI_40714.dets.jsonl'):
+    by[d.frame].append(d)
+for stride, start in ((1, 0), (2, 0), (2, 1)):
+    row = []
+    for share in (0, 0.9):
+        tr, ctr, ent = create('bytetrack'), DebouncedZoneCounter(Z), []
+        for k in range(8 * 1180 // stride):
+            f = start + k * stride
+            dets = [Detection(k, f * 40, d.bbox, d.score, d.cls) for d in by[f % 1180]]
+            for b in tr.update(k, f * 40, contained(dets, share, True) if share else dets):
+                ent += [e.ts_ms for e in ctr.update(b) if e.kind == 'enter']
+        row.append([sum(n * 47200 <= t < (n + 1) * 47200 for t in ent) for n in range(1, 7)])
+    print('looped replay, every', stride, 'frame(s) from frame', start, '| enters per loop, loops 2 to 7: baseline', row[0], '| contain090_same', row[1])"
+# the replay's share, set beside the on run's for scale: contain090_same on all of MVI_40714's saved detections at conf
+# 0.1, unmasked, as the edge sees them
+cd harness && python -c "
+from replay.detections import read_detections; from replay.secondbox import contained
+d = read_detections('runs/MVI_40714.dets.jsonl'); k = contained(d, 0.9, same_class=True)
+print('replay, MVI_40714, contain090_same at conf 0.1: detections', len(d), '| dropped', len(d) - len(k), '| share', round((len(d) - len(k)) / len(d), 4))" && cd ..
+# the live runs: off, on, off on one image, each read 656.4 s after its first stored gauge sample
+ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate,nb_frames media/UA-DETRAC/MVI_40714.mp4
+shasum -a 256 media/UA-DETRAC/MVI_40714.mp4
+mkdir -p harness/runs/live-MVI_40714
+docker compose --profile video build edge
+docker image inspect edge-cv-lab-edge --format '{{.Id}}' > harness/runs/live-MVI_40714/image.before
+docker run --rm edge-cv-lab-edge python -c "import inspect, torch, ultralytics; from ultralytics.engine.model import Model; print(ultralytics.__version__, torch.__version__); [print(l.strip()) for l in (inspect.getsource(Model.predict) + inspect.getsource(Model.track)).splitlines() if 'conf' in l and ('custom' in l or 'kwargs[' in l)]"
+q() { docker compose --profile video exec -T postgres psql -U postgres lab -At -F ' ' -c "$1"; }
+# RUNS: the runs, space-separated, off1 on off2 unless set. An invalid run is repeated with RUNS=<run>.2, from the q()
+# line above to the analysis, never from the build line (it would overwrite image.before); a run's share comes from its
+# name before any '.'. bash splits RUNS into words anyway, zsh only with shwordsplit
+setopt shwordsplit 2>/dev/null || true
+for run in ${RUNS:-off1 on off2}; do
+  share=0; [ "${run%%.*}" = on ] && share=0.9
+  make down && VIDEO=UA-DETRAC/MVI_40714.mp4 ZONE_POLYGON='[[0,307],[603,307],[643,505],[0,505]]' CONTAIN_SHARE=$share \
+    OCCUPANCY_GAUGE_MS=500 GRAFANA_PORT=3001 RTSP_BIND=127.0.0.1 make up-video
+  docker image inspect edge-cv-lab-edge --format '{{.Id}}' > harness/runs/live-MVI_40714/$run.image
+  docker inspect -f '{{json .Config.Cmd}}' $(docker compose --profile video ps -q camera) > harness/runs/live-MVI_40714/$run.camera
+  docker inspect -f '{{json .Config.Env}}' $(docker compose --profile video ps -q edge) > harness/runs/live-MVI_40714/$run.edge.env
+  i=0; until [ "$(q "select coalesce(max(ts_ms)-min(ts_ms),0) from zone_occupancy where device_id='edge-01'" 2>/dev/null || echo 0)" -ge 656400 ]; do
+    i=$((i+1)); [ $i -ge 90 ] && { echo TIMEOUT $run; break; }
+    q "select (extract(epoch from updated_at)*1000)::bigint, fps from device_status where device_id='edge-01' and state='online'" >> harness/runs/live-MVI_40714/$run.fps 2>/dev/null
+    sleep 10
+  done
+  q "select min(ts_ms), max(ts_ms) from zone_occupancy where device_id='edge-01'" > harness/runs/live-MVI_40714/$run.span
+  q "select kind, ts_ms, track_id from zone_events where device_id='edge-01' and counter='debounced' order by ts_ms" > harness/runs/live-MVI_40714/$run.events
+  docker inspect -f '{{.RestartCount}}' $(docker compose --profile video ps -q edge) > harness/runs/live-MVI_40714/$run.restarts
+  docker compose --profile video logs --no-log-prefix --no-color edge > harness/runs/live-MVI_40714/$run.edge.log 2>&1
+done
+make down
+docker image inspect edge-cv-lab-edge --format '{{.Id}}' > harness/runs/live-MVI_40714/image.after
+# per run, every runs/live-MVI_40714/*.span (a repeat <run>.2 included): validity, the settings it ran with, enters and
+# exits in [T0, T0 + 12 loops), median fps, the filter's counts; then (a) to (d) on the valid run of each name
+cd harness && python -c "
+import glob, json, os, statistics as st
+D, F, FPS, W = 'runs/live-MVI_40714', 1180, 25, 12  # the clip's frames and rate (the ffprobe line above); W whole loops
+LW = W * F * 1000 // FPS  # 566400 ms: twelve loops of the 1180-frame, 25 fps clip
+CLIP = '/media/UA-DETRAC/MVI_40714.mp4'
+ZONE = json.dumps(json.load(open('runs/MVI_40714.zone.json'))['polygon'], separators=(',', ':'))
+SET = {'CONTAIN_SAME_CLASS': '1', 'MIN_TRAVEL_PX': '0', 'OCCUPANCY_GAUGE_MS': '500', 'TRACKER': 'bytetrack.yaml'}
+B = ('off1', 'on', 'off2')  # the names; a repeat <run>.2 is read under its name, the part before the .
+WANT = {'off1': 'contain: off', 'on': 'contain: on share=0.9 same_class=1 conf=0.1 tracker=bytetrack.yaml', 'off2': 'contain: off'}
+img = {open(f'{D}/image.{w}').read().strip() for w in ('before', 'after')}
+R = {}
+for run in sorted((os.path.basename(f)[:-5] for f in glob.glob(f'{D}/*.span')), key=lambda r: (B.index(r.split('.')[0]), r)):
+    name, want = run.split('.')[0], WANT[run.split('.')[0]]
+    p = f'{D}/{run}'
+    sp = open(p + '.span').read().split()
+    s0, s1 = map(int, sp) if len(sp) == 2 and all(x.isdigit() for x in sp) else (0, 0)
+    t0 = s0 + 30000
+    inside = lambda t: t0 <= t < t0 + LW
+    ev = [l.split() for l in open(p + '.events').read().splitlines() if l.strip()]
+    hb = sorted({(int(a), float(b)) for a, b in (l.split() for l in open(p + '.fps').read().splitlines() if l.strip())})
+    hb = [(t, f) for t, f in hb if inside(t)]
+    log = open(p + '.edge.log').read().splitlines()
+    starts = [l for l in log if l.startswith('contain: ')]
+    lines = [dict(kv.split('=') for kv in l.split()[1:]) for l in log if l.startswith('contain ts_ms=')]
+    span = [d for d in lines if inside(int(d['ts_ms']))]
+    cmd = json.loads(open(p + '.camera').read() or 'null') or []
+    env = dict(e.split('=', 1) for e in json.loads(open(p + '.edge.env').read() or 'null') or [])
+    r = dict(enters=sum(k == 'enter' and inside(int(t)) for k, t, _ in ev), exits=sum(k == 'exit' and inside(int(t)) for k, t, _ in ev),
+             heartbeats=len(hb), fps_median=st.median(f for _, f in hb) if hb else 0.0,
+             dets=sum(int(d['dets']) for d in span), dropped=sum(int(d['dropped']) for d in span),
+             filter_ms=round(sum(float(d['filter_ms']) for d in span), 1))
+    r['enters_per_loop'] = round(r['enters'] / W, 2)
+    r['over'] = sum(int(d['dropped']) > int(d['dets']) for d in lines)
+    r['drop_share'] = round(r['dropped'] / r['dets'], 4) if r['dets'] else 0.0
+    r['filter_share'] = round(r['filter_ms'] / LW, 5)
+    checks = {'image one ID': img == {open(p + '.image').read().strip()},
+              'clip, zone and flags as set': CLIP in cmd and env.get('ZONE_POLYGON') == ZONE
+              and env.get('CONTAIN_SHARE') == ('0.9' if name == 'on' else '0') and all(env.get(k) == v for k, v in SET.items()),
+              'ran past t0 + W loops + 60 s': s1 - s0 >= 30000 + LW + 60000,
+              'no restart': open(p + '.restarts').read().strip() == '0',
+              'one startup line, as set': starts == [want],
+              'no stream unresponsive': not any('unresponsive' in l for l in log),
+              'heartbeats <= 30 s apart': len(hb) > 1 and max(b[0] - a[0] for a, b in zip(hb, hb[1:])) <= 30000,
+              'heartbeat lines only when on': bool(lines) == (name == 'on')}
+    r['valid'] = all(checks.values())
+    print(run, r, '| invalid:', [k for k, v in checks.items() if not v] or 'none')
+    R[run] = r
+use = {b: next((k for k in R if k.split('.')[0] == b and R[k]['valid']), None) for b in B}
+print('scored, the valid run of each name:', use)
+if None in use.values():
+    print('check not completed: no valid run of', [b for b, k in use.items() if k is None], '| (d) not decided')
+else:
+    on, offs = R[use['on']], [R[use['off1']], R[use['off2']]]
+    mean_off = sum(o['enters'] for o in offs) / 2
+    a = on['dropped'] > 0 and on['over'] == 0
+    b = on['filter_ms'] < 0.01 * LW and round(on['fps_median'], 6) >= round(0.9 * min(o['fps_median'] for o in offs), 6)
+    c = 0.5 * mean_off <= on['enters'] <= 1.5 * mean_off
+    print('(a) filter active:', a)
+    print('(b) throughput: filter', on['filter_ms'] < 0.01 * LW, '| median fps', round(on['fps_median'], 6) >= round(0.9 * min(o['fps_median'] for o in offs), 6), '| pass', b)
+    print('(c) enters within 0.5 to 1.5 x the off runs mean', mean_off, ':', c)
+    lo, gap = min(o['enters'] for o in offs), abs(offs[0]['enters'] - offs[1]['enters'])
+    if a and b and c:
+        print('(d) fewer enters on: on', on['enters'], '| off', [o['enters'] for o in offs], '| on below the lower off run by', lo - on['enters'],
+              '| the off runs differ by', gap, ':', lo - on['enters'] > gap)
+    else:
+        print('(d) not decided: failed', [k for k, v in (('(a)', a), ('(b)', b), ('(c)', c)) if not v])
+    print('fact, not scored: on enters inside the off runs range:', min(o['enters'] for o in offs) <= on['enters'] <= max(o['enters'] for o in offs))" && cd ..
 ```
 
 ## Citation
