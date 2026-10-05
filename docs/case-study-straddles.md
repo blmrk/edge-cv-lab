@@ -681,8 +681,9 @@ step's fix.
   baseline ByteTrack enter is on it either. nms050's track 687 enters on it in the last frame (vehicle 47, Results),
   and that enter counts as an extra. Two annotated cars have their footpoint just inside the top edge for 15 and 17
   frames, also with no truth visit.
-- The edge image installs Ultralytics unpinned (8.4.170 here), and the replay `bytetrack` adapter was written against an
-  earlier release: a rebuild can change the detections and the tracks.
+- The figures were measured on Ultralytics 8.4.170 and torch 2.14.1+cpu (Reproduce). The edge image installed both
+  unpinned when they were measured and pins them since; the replay `bytetrack` adapter was written against an earlier
+  release. A rebuild on other versions can change the detections and the tracks.
 - Second boxes, per detection: a detection on a vehicle whose annotated box was dropped for an ignored region is labelled
   other. The annotated box is dropped by its own centre and the detection kept by its own, so the two can fall on
   either side of a region's edge.

@@ -84,9 +84,11 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
 - The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
   on a quiet camera a lost visit stays open until then.
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
-  on 2026-09-28; the image installs `ultralytics>=8.3` unpinned, so a rebuild can bring a release with another signature.
-- The edge image now reports Ultralytics 8.4.170 (`docker run --rm edge-cv-lab-edge python -c "import ultralytics;
-  print(ultralytics.__version__)"`), the version `docs/case-study-straddles.md` records. The phantom study's figures
+  on 2026-09-28, and runs on 8.4.170 (the version the image is pinned to since 2026-10-05, with torch 2.14.1); the
+  pinned image has not been rebuilt yet, so the pin is not yet checked to resolve.
+- The edge image reports Ultralytics 8.4.170 (`docker run --rm edge-cv-lab-edge python -c "import ultralytics;
+  print(ultralytics.__version__)"`), the version `docs/case-study-straddles.md` records and `services/edge` now pins
+  (`requirements.txt`, `Dockerfile`). The phantom study's figures
   were measured on the version its doc names; the counting and balance studies' docs (`docs/case-study-tracking.md`,
   `docs/case-study-balance.md`) name none. None of them has been re-run.
 - ByteTrack fails the queue fixture at its defaults (1 of 6 visits, 5 ID transfers): the phantom study's stopped-car
