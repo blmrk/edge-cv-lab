@@ -6,7 +6,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 
 | Piece | State |
 |---|---|
-| Replay harness, 390 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 399 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
@@ -94,6 +94,9 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
     fewer enters than either off run, by more than the two off runs differed, the direction the replay gives. The on
     path differs from the off path in more than the filter, and which enters the on run did not log, and whether they
     were second boxes, is not known live. `docs/case-study-straddles.md`, On the clip under study.
+18. `real-after.gif` shows the zone rule act: a track it holds back is drawn grey, tagged "#ID held", from the read-only
+    `DebouncedZoneCounter.held()` (`trackviz`; the services do not call it); headers' totals unchanged, `real-compare.gif`
+    byte-identical.
 
 ## Known rough edges
 - The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard (now
