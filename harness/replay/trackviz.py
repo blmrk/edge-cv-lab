@@ -15,7 +15,8 @@ still run from the first frame, so IDs match a full run; the strip counters star
 
 Fixes per run, one value per tracker in --trackers order: --filters drops detections before that run's tracker (none,
 or a second-box filter of replay.secondbox such as contain090_same), --min-travel-px sets that run's zone rule (0: off).
-A run's label is followed by what was applied: "bytetrack + contain090_same + zone rule 30 px".
+A run's label is followed by what was applied: "bytetrack + contain090_same + zone rule 30 px". In a run with the zone
+rule, a track it holds back (not yet moved that far, so its enter cannot commit) is drawn grey and tagged "#ID held".
 """
 from __future__ import annotations
 
@@ -34,6 +35,7 @@ from .viz import BG, FONT, LINE, ROAD, TEXT, ZONE_C, _palette, draw_zone
 
 W = 1280
 TAG_COLOURS = 24  # over footage, ID colours cycle through this many hues so each gets an exact GIF palette entry
+GREY = (200, 200, 200)  # ground-truth outlines over footage, and tracks the zone rule holds back; a reserved GIF entry
 FILTERS = {k: keep for k, _, _, keep, _ in secondbox.STEPS if k.startswith("contain")}  # frame-local: run per frame
 
 
@@ -133,15 +135,16 @@ def save_fixed_camera_gif(images: list[np.ndarray], out: str, fps: int, hold: in
     gif[0].save(out, save_all=True, append_images=gif[1:], duration=round(1000 / fps), loop=0, optimize=True)
 
 
-def draw_tag(img: np.ndarray, bx1: int, by1: int, tid: int, colour, top: int):
+def draw_tag(img: np.ndarray, bx1: int, by1: int, tid: int, colour, top: int, note: str = ""):
     """Filled ID tag, readable on any footage, sitting on the box's visible top edge: by1, or `top`, the strip's first
     row, for a box cut by the crop. Where that edge is under the strip header (40 px at W wide), or too close below it
-    for the tag to fit above, the tag goes just below the header, still at the box's left."""
-    (tw, th), _ = cv2.getTextSize(f"#{tid}", FONT, 0.9, 2)
+    for the tag to fit above, the tag goes just below the header, still at the box's left. `note` follows the ID."""
+    text = f"#{tid} {note}" if note else f"#{tid}"
+    (tw, th), _ = cv2.getTextSize(text, FONT, 0.9, 2)
     header = top + int(40 * img.shape[1] / W)                         # a narrower clip is scaled up to W after this
     ty = max(max(by1, top), header + th + 10)                         # the tag's bottom row
     cv2.rectangle(img, (bx1, ty - th - 10), (bx1 + tw + 8, ty), colour, -1)
-    cv2.putText(img, f"#{tid}", (bx1 + 4, ty - 5), FONT, 0.9, (0, 0, 0), 2, cv2.LINE_AA)
+    cv2.putText(img, text, (bx1 + 4, ty - 5), FONT, 0.9, (0, 0, 0), 2, cv2.LINE_AA)
 
 
 def _crop(img: np.ndarray, y1: int, y2: int) -> np.ndarray:
@@ -221,20 +224,23 @@ def main():
         for g in gt.get(f, []):                                       # the real vehicles
             gx1, gy1, gx2, gy2 = map(int, g.bbox)
             if footage:                                               # footage shows the vehicle: outline only
-                cv2.rectangle(img, (gx1, gy1), (gx2, gy2), (200, 200, 200), 1)
+                cv2.rectangle(img, (gx1, gy1), (gx2, gy2), GREY, 1)
             else:
                 cv2.rectangle(img, (gx1 + 4, gy1 + 10), (gx2 - 4, gy2), (95, 95, 95), -1)
         if a.occluder:                                                # drawn over the vehicles
             cv2.rectangle(img, (a.occluder[0], 300), (a.occluder[1], 500), (70, 74, 82), -1)
             cv2.putText(img, "pillar", (a.occluder[0] + 22, 292), FONT, 0.6, (150, 150, 150), 1, cv2.LINE_AA)
-        for b in boxes:
+        held_first = sorted(boxes, key=lambda b: not r["counter"].held(b.track_id))  # a wider held tag never covers a vehicle's
+        for b in held_first:
             bx1, by1, bx2, by2 = map(int, b.bbox)
-            c = _palette(b.track_id % TAG_COLOURS if footage else b.track_id)
+            held = r["counter"].held(b.track_id)                      # this run's zone rule holds its enter back
+            c = GREY if held else _palette(b.track_id % TAG_COLOURS if footage else b.track_id)
+            note = "held" if held else ""
             cv2.rectangle(img, (bx1, by1), (bx2, by2), c, 3)
             if footage:
-                draw_tag(img, bx1, by1, b.track_id, c, y1)
+                draw_tag(img, bx1, by1, b.track_id, c, y1, note)
             else:
-                cv2.putText(img, f"#{b.track_id}", (bx1, by1 - 8), FONT, 0.8, c, 2, cv2.LINE_AA)
+                cv2.putText(img, f"#{b.track_id} {note}".rstrip(), (bx1, by1 - 8), FONT, 0.8, c, 2, cv2.LINE_AA)
         strip = _crop(img, y1, y2)
         if footage:
             cv2.putText(strip, f"{ts / 1000:5.1f} s", (W - 130, strip.shape[0] - 16), FONT, 0.8, TEXT, 2, cv2.LINE_AA)
@@ -285,7 +291,7 @@ def main():
     images += [images[-1]] * (a.fps * 2)                              # hold the final frame
     overlays += overlays[-1:] * (a.fps * 2)
     if clip:
-        overlay = [_palette(i) for i in range(TAG_COLOURS)] + [ZONE_C, TEXT, (0, 0, 0), (200, 200, 200)]
+        overlay = [_palette(i) for i in range(TAG_COLOURS)] + [ZONE_C, TEXT, (0, 0, 0), GREY]
         save_fixed_camera_gif(images, a.out, a.fps, keep=[c[::-1] for c in overlay], overlays=overlays)  # BGR -> RGB
     else:
         import imageio.v2 as imageio                                  # the schematic GIF only

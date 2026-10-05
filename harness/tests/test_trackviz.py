@@ -187,15 +187,17 @@ FRAMES = 30
 
 def scene(tmp_path, boxes):
     """A 160 x 120 clip of FRAMES grey frames at 10 fps, a zone over most of it, and the same detections, (bbox, score)
-    of class car, on every frame. Returns the trackviz arguments for them."""
+    of class car, on every frame, or, given a function of the frame, the detections it returns. Returns the trackviz
+    arguments for them."""
     clip = str(tmp_path / "clip.avi")
     out = cv2.VideoWriter(clip, cv2.VideoWriter_fourcc(*"MJPG"), 10, (160, 120))
     for _ in range(FRAMES):
         out.write(np.full((120, 160, 3), 90, np.uint8))
     out.release()
+    at = boxes if callable(boxes) else lambda f: boxes
     (tmp_path / "dets.jsonl").write_text("".join(
         json.dumps({"frame": f, "ts_ms": 100 * f, "bbox": bbox, "score": score, "cls": "car"}) + "\n"
-        for f in range(FRAMES) for bbox, score in boxes))
+        for f in range(FRAMES) for bbox, score in at(f)))
     (tmp_path / "zone.json").write_text(json.dumps({"polygon": [[5, 5], [155, 5], [155, 115], [5, 115]]}))
     return ["--video", clip, "--dets", str(tmp_path / "dets.jsonl"), "--zone", str(tmp_path / "zone.json"),
             "--out", str(tmp_path / "out.gif"), "--width", "160"]
@@ -261,6 +263,72 @@ def test_both_fixes_on_one_run_are_both_named(tmp_path, monkeypatch, capsys):
     assert render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "--labels", "IoU",
                   "--filters", "contain090_same", "--min-travel-px", "30") \
         == ["IoU + contain090_same + zone rule 30 px: IDs 1, visits closed 0"]
+
+
+GREY = (200, 200, 200)                                # a reserved overlay colour over footage
+TAGS = [trackviz._palette(i)[::-1] for i in range(trackviz.TAG_COLOURS)]   # the ID colours, RGB
+
+
+def tag_row(img, y, x1, x2):
+    """(pixels exactly grey, pixels exactly an ID colour) on row y from x1 to x2 of a decoded GIF frame."""
+    row = img[y, x1:x2]
+    return (row == GREY).all(axis=1).sum(), sum((row == c).all(axis=1).sum() for c in TAGS)
+
+
+def tag_width(text):
+    """Columns of a footage tag reading `text`, both rectangle edges included."""
+    return cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0][0] + 8 + 1
+
+
+@pytest.mark.parametrize("ruled", [0, 1])              # either order: each strip asks its own run's counter
+def test_a_track_the_zone_rule_holds_is_drawn_grey_and_tagged_held(tmp_path, monkeypatch, capsys, ruled):
+    # a box that never moves, inside the zone: the run with the rule holds its enter back for the whole clip, and
+    # shows it; the run without the rule draws it in its ID colour, as before
+    args = scene(tmp_path, [([20, 50, 60, 90], 0.9)])
+    travel = ["0", "0"]
+    travel[ruled] = "30"
+    lines = render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "greedy_iou", "--labels", "a", "b",
+                   "--min-travel-px", *travel)
+    said = ["a: IDs 1, visits closed 1", "b: IDs 1, visits closed 1"]
+    said[ruled] = "ab"[ruled] + " + zone rule 30 px: IDs 1, visits closed 0"
+    assert lines == said                                # labels and totals as without the grey
+    last = decoded(tmp_path / "out.gif")[-1][0]
+    for run in (0, 1):                                  # each strip is 120 rows; the tag's row under its text
+        grey, coloured = tag_row(last, 120 * run + 49, 0, 160)
+        if run == ruled:
+            assert coloured == 0 and abs(grey - tag_width("#1 held")) <= 2, (run, grey, coloured)
+        else:
+            assert grey == 0 and abs(coloured - tag_width("#1")) <= 2, (run, grey, coloured)
+
+
+def test_a_held_track_takes_its_colour_once_it_has_moved(tmp_path, monkeypatch, capsys):
+    # one run with the rule: a box that never moves, and one that drives right 2 px a frame, 58 px by the last frame
+    args = scene(tmp_path, lambda f: [([20, 50, 60, 90], 0.9), ([70 + 2 * f, 95, 100 + 2 * f, 115], 0.9)])
+    assert render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "--min-travel-px", "30") \
+        == ["greedy_iou + zone rule 30 px: IDs 2, visits closed 0"]
+    frames = [img for img, _ in decoded(tmp_path / "out.gif")]
+    first, last = frames[0], frames[-1]
+    assert tag_row(first, 94, 70, 160)[1] == 0 and tag_row(first, 94, 70, 160)[0] > 80   # first frame: not moved yet
+    grey, coloured = tag_row(last, 94, 128, 160)
+    assert grey == 0 and coloured >= 28, (grey, coloured)           # moved 58 px: its ID colour
+    grey, coloured = tag_row(last, 49, 0, 160)
+    assert coloured == 0 and abs(grey - tag_width("#1 held")) <= 2  # never moved: still held
+
+
+def test_a_vehicles_tag_is_drawn_over_a_held_tag_that_would_cover_it(tmp_path, monkeypatch, capsys):
+    # #1 drives left 2 px a frame and ends with its tag inside the wider "#2 held" tag of a box that never moves;
+    # the tracker reports #2 after #1, so drawing in its order would cover #1's tag: held tags go first
+    from replay.schema import TrackBox
+
+    class InOrder:                                      # ids in detection order, reported in that order every frame
+        def update(self, f, ts, ds):
+            return [TrackBox(f, ts, i + 1, tuple(d.bbox)) for i, d in enumerate(ds)]
+    monkeypatch.setattr(trackviz, "create", lambda name, **params: InOrder())
+    args = scene(tmp_path, lambda f: [([130 - 2 * f, 50, 160 - 2 * f, 90], 0.9), ([20, 50, 60, 90], 0.9)])
+    render(monkeypatch, capsys, *args, "--trackers", "greedy_iou", "--min-travel-px", "30")
+    last = decoded(tmp_path / "out.gif")[-1][0]
+    grey, coloured = tag_row(last, 49, 72, 160)        # #1's tag starts at x=72, inside #2's held tag (20 to about 125)
+    assert abs(coloured - tag_width("#1")) <= 2, (grey, coloured)
 
 
 @pytest.mark.parametrize("extra, said", [
