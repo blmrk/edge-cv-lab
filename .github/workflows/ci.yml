@@ -1,5 +1,6 @@
 name: ci
 on: [push, pull_request]
+permissions: { contents: read }  # the job only reads the repo; the token cannot push, comment or edit releases
 jobs:
   harness:
     runs-on: ubuntu-24.04
