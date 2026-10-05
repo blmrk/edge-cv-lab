@@ -13,7 +13,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 | Tracker bench: greedy_iou, groundplane, ByteTrack (Ultralytics, from video or `bytetrack` on saved detections), MOT bridge, TrackEval runner | tested; **boxmot adapter untested** (needs torch) |
 | Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken; opt-in occupancy gauge (`OCCUPANCY_GAUGE_MS=500`) checked on the sim and run live on the video edge (MTID clip, with and without `MIN_TRAVEL_PX=30`) |
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
-| Video profile (MediaMTX + YOLO edge) | booted on the MTID intersection clip with the labelled zone; class-agnostic NMS |
+| Video profile (MediaMTX + YOLO edge) | runs the MTID clip by default, or any clip under `media/` with its zone (`VIDEO`, `ZONE_POLYGON`, `RTSP_BIND` on the `make up-video` line); class-agnostic NMS |
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
@@ -41,7 +41,8 @@ Empty. Task C closed on 2026-10-05 on the replay result (Done 14 and 15); what w
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.
 - boxmot adapter: `pip install boxmot`, fix `update()` columns, add `boxmot_bytetrack` and `boxmot_ocsort` rows.
 - Published tracker (FastTracker or UCMCTrack) through `replay.motformat` and `scripts/trackeval_run.py`.
-- The second-box steps on another annotated clip: the result is one clip, one detector, one tracker.
+- The second-box steps on a third annotated clip: MVI_40855 turned out to have no second-box enter at its baseline
+  (`docs/case-study-straddles.md`, On a second clip), so the fix's effect on enters still rests on one clip.
 - The candidate straddle fix (drop a box mostly covered by two higher-scoring boxes, keeping a car seen in
   the gap between two nearer ones): no enter on MVI_40714 sits on a box across two separate vehicles, so
   it has nothing to score there; track 451 on the expressway clip shows a straddle with fewer than two
