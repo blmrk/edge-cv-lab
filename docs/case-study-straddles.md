@@ -2,7 +2,8 @@
 
 > Status: baseline measured on one annotated public clip. The fix moved to second boxes: its design is declared under
 > Fix, its steps have been run, and by the declared rule contain090_same wins, measured in the replay harness only
-> (Results). Every measured figure comes from a command in Reproduce.
+> (Results). Since 2026-10-05 the edge runs it opt-in (`CONTAIN_SHARE=0.9`, off by default), checked live on MTID only
+> (In the live service (opt-in)). Every measured figure comes from a command in Reproduce.
 
 ## Problem
 
@@ -797,27 +798,61 @@ defect is a new commit with a new declared set of runs; the first set stays repo
 
 ### Live results
 
-TBD until the runs. The cells will come from the live check's commands at the end of Reproduce, whose analysis prints
-each run's figures and validity, then (a) to (c).
+Run on 2026-10-05 in the declared order, off1, on, off2, on one edge image. Every run was valid, so none was repeated.
+Every figure here comes from the live check's commands at the end of Reproduce: the ffprobe, sha256 and gate lines
+before the runs; the `docker image inspect` lines, which record the edge image ID in `runs/live/image.before`, each
+`runs/live/<run>.image` and `runs/live/image.after`; the analysis, which prints each run's figures and validity, then
+(a) to (c); and the replay-share command.
 
 Before any row is read:
 
-- the clip: sha256 TBD; frame count and rate TBD;
-- the gate: Ultralytics and torch in the image TBD; `Model.track`'s `conf` line TBD;
-- the edge image ID before off1 and after the last run: TBD.
+- the clip: sha256 `396f98e418bbf7415c2bc74d24da4d1ef02bdb6656e39c0e1121707ab51315ec`; ffprobe prints `nb_frames=3199`
+  and `r_frame_rate=30/1`, the frame count and rate the window is declared on;
+- the gate: the image prints `8.4.170 2.14.1+cpu`, the declared Ultralytics and torch, and these `conf` lines from
+  `Model.predict` and `Model.track`:
+  `custom = {"conf": 0.25, "batch": 1, "save": is_cli, "mode": "predict", "rect": True, "embed": None}` and
+  `kwargs["conf"] = 0.1 if kwargs.get("conf") is None else kwargs["conf"]  # trackers need low-confidence input`.
+  `Model.track` sets `conf` to 0.1 when none is passed, so both gate checks held and the runs went ahead;
+- the edge image ID before off1 and after off2, the same both times:
+  `sha256:13a4cf3cccea881b701390ba4d0c8d44f61082db3ee3d32f8cbf5e53b99d2a09`.
 
 | run | image ID (short) | valid | enters | exits | heartbeats in the span | median fps | dropped / dets | filter_ms share |
 |---|---|---|---|---|---|---|---|---|
-| off1 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| on | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| off2 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| off1 | 13a4cf3cccea | yes | 84 | 84 | 31 | 14.2 | – | – |
+| on | 13a4cf3cccea | yes | 88 | 88 | 29 | 14.8 | 718 / 29480 (0.0244) | 0.00032 (103.6 ms) |
+| off2 | 13a4cf3cccea | yes | 79 | 79 | 27 | 14.5 | – | – |
 
-A repeated run gets its own row, `<run>.2`, under the first.
+The short image ID is the first 12 hex characters after `sha256:` in each run's recorded ID (`runs/live/<run>.image`);
+all three equal the full ID above. The off path logs no `contain ts_ms=` line, so the off runs have no `dropped`, `dets` or `filter_ms` (the
+analysis prints 0 for each).
 
-- (a) filter active: TBD.
-- (b) throughput: TBD.
-- (c) gross harm: TBD.
-- The on run's enters within the off runs' range (a fact, not scored): TBD.
+**Validity.** The analysis prints `invalid: none` for each run. In each, the edge image ID equals the ones recorded
+before off1 and after off2; the stored gauge samples reached S0 + 409900 ms (no TIMEOUT); the edge container's restart
+count is 0; the log holds exactly one startup line, `contain: off` in off1 and off2 and
+`contain: on share=0.9 same_class=1 conf=0.1 tracker=bytetrack.yaml` in on; no line contains `unresponsive`; the span
+holds at least 2 heartbeats, none more than 30 s after the one before; and `contain ts_ms=` lines appear in the on run
+only.
+
+**Pass**, on the on run:
+
+- (a) filter active: **pass**. `dropped` summed over the span is 718, above 0, and no heartbeat line has `dropped`
+  above `dets`.
+- (b) throughput: **pass**. 1. `filter_ms` summed over the span is 103.6 ms, 0.00032 of the span, under 0.01. 2. Its
+  median fps, 14.8, is at least 0.9 times the lower of the off runs' medians, off1's 14.2 (off2's is 14.5).
+- (c) gross harm: **pass**. Its 88 enters lie within 0.5 to 1.5 times the mean of off1's and off2's enters, 81.5.
+
+Reported, not scored:
+
+- The on run's enters within the off runs' range: no. Its 88 enters lie above off1's 84 and off2's 79.
+- The on run's `dropped` / `dets`, 718 of 29480 (0.0244), set beside the replay's for scale only: on MTID's saved
+  detections at `conf` 0.1, contain090_same drops 467 of 20151, 0.0232 (the replay-share command). Neither is scored
+  against the other.
+- Exits, heartbeats in the span, the `filter_ms` share, the image ID and the versions: above.
+
+**What this shows.** (a) to (c) pass: on MTID, on one image and on CPU, the opt-in path runs and, by (c), does no gross
+harm. It does not show that the fix carries over. The on run's enters lying above the off runs' range are not read as
+the filter's effect; beyond (a) to (c) the check makes no claim about the filter's effect on counts, and its effect on
+enters is measured in the replay harness only (What the live check may claim).
 
 ### What the live check may claim
 
@@ -1204,8 +1239,8 @@ for px in 0 30; do
   python -m replay.secondbox --tracks runs/phantoms/baseline.jsonl --gt runs/mtid.gt.jsonl --zone zone.json --min-travel-px $px
 done
 cd ..
-# NOT RUN YET: the live check declared under In the live service (opt-in), whose Live results stay TBD until
-# it runs. From the repo root, with nothing else running in Docker.
+# RUN on 2026-10-05, off1, on, off2 with no repeat: the live check declared under In the live service (opt-in),
+# whose figures are under Live results. From the repo root, with nothing else running in Docker.
 # the opt-in second-box filter in the live edge on the MTID clip (media/sample.mp4): off, on, off on one image, each
 # read 409.9 s after its first stored gauge sample (In the live service (opt-in)); GRAFANA_PORT=3001 when 3000 is taken
 ffprobe -v error -select_streams v:0 -show_entries stream=r_frame_rate,nb_frames media/sample.mp4
