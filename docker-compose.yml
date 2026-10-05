@@ -82,7 +82,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana-oss:11.2.0
+    image: grafana/grafana-oss:11.2.10-security-01  # past the CVE-2025-4123 fix on the 11.2 line (SECURITY.md)
     depends_on: [postgres]
     restart: unless-stopped
     ports: ["${LAB_BIND:-127.0.0.1}:${GRAFANA_PORT:-3000}:3000"]  # GRAFANA_PORT=3001 make up when 3000 is taken
