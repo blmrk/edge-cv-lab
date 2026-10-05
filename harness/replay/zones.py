@@ -169,6 +169,13 @@ class DebouncedZoneCounter:
         return [(tid, (now_ms - s.entered_ts) / 1000) for tid, s in self._s.items()
                 if s.inside and (seen_within_ms is None or now_ms - s.last_ts <= seen_within_ms)]
 
+    def held(self, track_id: int) -> bool:
+        """True while min_travel_px holds the track's enter back: the track has been seen, the rule is on, and its
+        anchor has not yet moved min_travel_px from where it was first seen. False for a track never seen, with the
+        rule off, and for good once the track has moved that far. Read-only: asking changes no state and no event."""
+        s = self._s.get(track_id)
+        return self.min_travel_px > 0 and s is not None and not s.moved
+
     def flush(self) -> list[ZoneEvent]:
         """End of stream: release enter events for tracks still inside."""
         out = [s.pending for s in self._s.values() if s.pending]

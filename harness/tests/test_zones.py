@@ -140,6 +140,69 @@ def test_min_travel_counts_a_parked_car_that_drives_off_from_when_it_moved():
     assert [e.frame for e in enters] == [xs.index(620)]  # stamped once it had moved 20 px, not when the track started
 
 
+def _parked_then_leaves():
+    # footpoint at x=600 for 2 s, then 5 px a frame to 700 and back to 600: a parked car that drives off and returns
+    xs = [600] * 60 + list(range(605, 705, 5)) + list(range(695, 595, -5))
+    return xs, [TrackBox(f, f * 1000 // 30, 1, (x - 45, 340, x + 45, 400), 0.9, "car") for f, x in enumerate(xs)]
+
+
+def _held_after_each(counter, boxes):
+    """held() for each box's track, asked right after that box's update()."""
+    out = []
+    for b in boxes:
+        counter.update(b)
+        out.append(counter.held(b.track_id))
+    return out
+
+
+def test_held_while_the_zone_rule_waits_for_a_track_to_move_and_never_again_once_it_has():
+    xs, car = _parked_then_leaves()
+    got = _held_after_each(DebouncedZoneCounter(POLY, min_travel_px=30), car)
+    moved = xs.index(630)                             # the first box 30 px from where the track was first seen
+    assert got == [f < moved for f in range(len(xs))]  # back at 600 later: still not held, it has moved
+
+
+def test_held_follows_min_travel_px():
+    xs, car = _parked_then_leaves()
+    got = _held_after_each(DebouncedZoneCounter(POLY, min_travel_px=10), car)
+    assert got == [f < xs.index(610) for f in range(len(xs))]
+
+
+def test_never_held_with_the_rule_off():
+    _, car = _parked_then_leaves()
+    dash = [TrackBox(f, f * 1000 // 30, 2, (580 + f % 3, 380, 610 + f % 3, 400 + f % 2), 0.2, "car") for f in range(150)]
+    got = _held_after_each(DebouncedZoneCounter(POLY), sorted(car + dash, key=lambda b: (b.frame, b.track_id)))
+    assert len(got) == 150 + len(car) and not any(got)
+
+
+def test_held_is_false_for_a_track_never_seen():
+    c = DebouncedZoneCounter(POLY, min_travel_px=30)
+    assert c.held(1) is False
+    c.update(TrackBox(0, 0, 1, (555, 340, 645, 400), 0.9, "car"))
+    assert (c.held(1), c.held(2)) == (True, False)
+    assert c.held(2) is False                         # asking does not make it seen
+
+
+def test_asking_held_does_not_change_the_events():
+    # a parked car that drives off, a phantom dash, and a car that drives through, with held() asked for every track
+    # (and one never seen) before and after each update: the same events, stamped the same, as without asking
+    _, parked = _parked_then_leaves()
+    dash = [TrackBox(f, f * 1000 // 30, 2, (580 + f % 3, 380, 610 + f % 3, 400 + f % 2), 0.2, "car") for f in range(150)]
+    through = [TrackBox(b.frame, b.ts_ms, 3, b.bbox, b.score, b.cls) for b in _drive_through(90)]
+    boxes = sorted(parked + dash + through, key=lambda b: (b.frame, b.track_id))
+    for px in (0, 30):
+        quiet, asked = DebouncedZoneCounter(POLY, min_travel_px=px), DebouncedZoneCounter(POLY, min_travel_px=px)
+        want = [e for b in boxes for e in quiet.update(b)] + quiet.flush()
+        got = []
+        for b in boxes:
+            before = [asked.held(t) for t in (1, 2, 3, 9)]
+            got += asked.update(b)
+            after = [asked.held(t) for t in (1, 2, 3, 9)]
+            assert before[3] is after[3] is False
+        assert got + asked.flush() == want, px
+        assert summarize(want)["enters"] == (3 if px == 0 else 2)    # the rule drops the dash, keeps both cars
+
+
 def test_explain_passes_counter_settings_through():
     from replay.score import explain
     square = [(100, 100), (500, 100), (500, 500), (100, 500)]
