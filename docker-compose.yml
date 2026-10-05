@@ -6,16 +6,16 @@ services:
   mediamtx:
     profiles: [video]
     image: bluenviron/mediamtx:latest
-    ports: ["8554:8554"]
+    ports: ["${RTSP_BIND:+${RTSP_BIND}:}8554:8554"]
     restart: unless-stopped
 
-  camera:  # loops ./media/sample.mp4 forever as rtsp://mediamtx:8554/cam1
+  camera:  # loops ./media/sample.mp4, or ./media/$VIDEO when set, forever as rtsp://mediamtx:8554/cam1
     image: linuxserver/ffmpeg:latest
     profiles: [video]
     depends_on: [mediamtx]
     volumes: ["./media:/media:ro"]
     command: >
-      -re -stream_loop -1 -i /media/sample.mp4
+      -re -stream_loop -1 -i /media/${VIDEO:-sample.mp4}
       -c:v libx264 -preset veryfast -tune zerolatency -an
       -f rtsp -rtsp_transport tcp rtsp://mediamtx:8554/cam1
     restart: unless-stopped
@@ -63,7 +63,7 @@ services:
       DEVICE_ID: edge-01
       MQTT_HOST: toxiproxy
       TRACKER: bytetrack.yaml
-      ZONE_POLYGON: "[[552,112],[334,235],[882,581],[1020,277]]"  # = harness/zone.json, drawn in tools/label.html on media/sample.mp4
+      ZONE_POLYGON: "${ZONE_POLYGON:-[[552,112],[334,235],[882,581],[1020,277]]}"  # default = harness/zone.json, drawn in tools/label.html on media/sample.mp4; set it with VIDEO for another clip
       MIN_TRAVEL_PX: "${MIN_TRAVEL_PX:-0}"            # 0 = off; 30 keeps static phantoms out (docs/case-study-phantoms.md)
       OCCUPANCY_GAUGE_MS: "${OCCUPANCY_GAUGE_MS:-0}"  # 0 = off; 500 publishes vehicles in zone (docs/case-study-balance.md)
       CONTAIN_SHARE: "${CONTAIN_SHARE:-0}"            # 0 = off; 0.9 drops a box 0.9 inside a higher-scoring one (docs/case-study-straddles.md)

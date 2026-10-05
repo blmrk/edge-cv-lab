@@ -164,7 +164,7 @@ More in [docs/architecture.md](docs/architecture.md).
 - The edge node runs YOLO on CPU. It models pipeline behaviour, not accelerator (NPU) numerics or latency.
 - Toxiproxy shapes TCP only. It does not model packet loss or radio behaviour of a real cellular link.
 - The `sim` scene hands the counter perfect track IDs, so it tests zone logic, not tracking. Tracker comparisons run on the queue fixture's raw detections instead.
-- For `make up-video`, tune `mem_limit` and the zone polygon for your clip.
+- For `make up-video`, tune `mem_limit` for your clip, and pass the clip and its zone: `VIDEO=<file under media/, no spaces> ZONE_POLYGON='[[x,y],...]' make up-video` (defaults: `sample.mp4` and its zone).
 
 ## Licence
 
