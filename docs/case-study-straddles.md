@@ -752,98 +752,185 @@ it is.
 
 #### Results on the second clip
 
-Not run yet. Every cell is TBD until the commands marked not run yet at the end of Reproduce have run, after this
-subsection is committed; the n/a and "unchanged" cells are declared above.
+On a second clip was committed before any step ran on this clip, and the results change nothing in it. The cells come
+from the commands marked RUN on 2026-10-05 at the end of Reproduce's MVI_40855 block; the n/a and "unchanged" cells are
+declared above. Track IDs are each run's own: every tracker run restarts its IDs, so one number in two rows need not be
+one track.
 
 Checks before any row is read:
 
 - The gate, before any step runs: the edge image's versions and model sha256 against those under Results, and MTID's
-  0.7 dump against `runs/dets.agnostic.jsonl`: TBD.
-- The 0.7 dump byte-identical to the saved detections: TBD.
+  0.7 dump against `runs/dets.agnostic.jsonl`: passed. The image prints Ultralytics 8.4.170, torch 2.14.1+cpu and
+  `f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36`, and `cmp` prints nothing for MTID's 0.7 dump, so
+  the steps ran.
+- The 0.7 dump byte-identical to the saved detections: yes. `cmp` prints nothing, so nms050 is computed.
 - The baseline step's tracks against `runs/MVI_40855.bytetrack.jsonl`, sorted, and its rows against the baseline above:
-  TBD.
-- Enters whose frame differs from the saved baseline file's: TBD.
+  the sorted diff prints nothing. The baseline rows of the `--dets` run equal the by-vehicle baseline above at 0 and 30
+  px, and its per-detection label counts and its 2421 nested vehicle-frames equal the per-detection baseline above;
+  `--dets` does not print the detections, scored or "on N vehicles" figures, and its label counts sum to the scored
+  29838. The `--tracks` runs on the saved file print the by-vehicle baseline above again.
+- Enters whose frame differs from the saved baseline file's: one, as the design allows. Track 21, found on vehicle 4,
+  commits at frame 579 (23160 ms) on the tracks in memory and at frame 580 (23200 ms) on the saved file, at 0 and 30 px;
+  its kind, vehicle and IoU (0.88) are the same. No other enter differs in frame, kind, vehicle or judging order.
 
 Visits, MVI_40855, against its 23 truth visits:
 
 | key | enters | static | moving | matched | false visits | missed visits | f1 | moving f1 | queue matched | queue false |
 |---|---|---|---|---|---|---|---|---|---|---|
-| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| birth040 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | n/a | n/a |
-| birth050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | n/a | n/a |
-| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | n/a | n/a |
+| baseline | 25 | 2 | 23 | 23 | 2 | 0 | 0.958 | 1.0 | 6 | 0 |
+| contain080 | 24 | 1 | 23 | 22 | 2 | 1 | 0.936 | 0.957 | 6 | 0 |
+| contain090 | 25 | 2 | 23 | 23 | 2 | 0 | 0.958 | 0.957 | 6 | 0 |
+| contain080_same | 24 | 1 | 23 | 23 | 1 | 0 | 0.979 | 1.0 | 6 | 0 |
+| contain090_same | 24 | 1 | 23 | 23 | 1 | 0 | 0.979 | 1.0 | 6 | 0 |
+| birth040 | 23 | 0 | 23 | 23 | 0 | 0 | 1.0 | 1.0 | n/a | n/a |
+| birth050 | 23 | 0 | 23 | 23 | 0 | 0 | 1.0 | 1.0 | n/a | n/a |
+| nms050 | 24 | 1 | 23 | 23 | 1 | 0 | 0.979 | 1.0 | n/a | n/a |
+
+The queue columns are the queue fixture's, which no containment step can change (above). The time match and the found
+sets below disagree for one step: contain080 matches 22 and finds all 23 vehicles. Found sets decide; the commands here
+do not break the difference down.
 
 By vehicle, MVI_40855, counter at its defaults (this table decides the winner on this clip):
 
 | key | found | missed | extra | duplicate | part | again | no truth visit | no annotated box | removed | new |
 |---|---|---|---|---|---|---|---|---|---|---|
-| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| birth040 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| birth050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| baseline | 23 | none | 2 | 0 | 0 | 0 | 0 | 2: 69, 230 | 0 | 0 |
+| contain080 | 23 | none | 1 | 0 | 0 | 0 | 0 | 1: 221 | 0 | 0 |
+| contain090 | 23 | none | 2 | 0 | 0 | 1: 428 on 7 | 0 | 1: 234 | 0 | again 428 on 7 |
+| contain080_same | 23 | none | 1 | 0 | 0 | 0 | 0 | 1: 222 | 0 | 0 |
+| contain090_same | 23 | none | 1 | 0 | 0 | 0 | 0 | 1: 229 | 0 | 0 |
+| birth040 | 23 | none | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| birth050 | 23 | none | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| nms050 | 23 | none | 1 | 0 | 0 | 0 | 0 | 1: 112 | 0 | 0 |
+
+No MVI_40855 enter is not judged, in any step or run. The removed and new columns compare duplicate, part and again
+extras only, as declared: the one they list is contain090's again enter, vehicle 7 under its track 428 in frame 249
+(9960 ms). The enters on no annotated box are compared by time in the per-enter table below.
 
 By vehicle, MVI_40855, zone rule 30 px, against the zone rule's own split of the baseline (the baseline row is the zone
 rule alone, a reference):
 
 | key | found | missed | extra | duplicate | part | again | no truth visit | no annotated box | removed | new |
 |---|---|---|---|---|---|---|---|---|---|---|
-| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| birth040 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| birth050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| baseline | 23 | none | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| contain080 | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 18 | 0 | 0 |
+| contain090 | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 19 | 0 | 0 |
+| contain080_same | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 19 | 0 | 0 |
+| contain090_same | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 19 | 0 | 0 |
+| birth040 | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 19 | 0 | 0 |
+| birth050 | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 19 | 0 | 0 |
+| nms050 | 22 | 6 | 1 | 0 | 0 | 0 | 0 | 1: 19 | 0 | 0 |
+
+Under the zone rule every step misses vehicle 6, which the zone-rule baseline finds (its track 19 in frame 385, 15400
+ms), and has one enter on no annotated box: in frame 15 (600 ms) under the containment steps and nms050, in frame 16
+(640 ms) under the birth steps. The zone-rule baseline has no enter on no annotated box, so none of these lies within
+2000 ms of one. The seven rows are one event, looked at after the results below.
 
 Per detection, MVI_40855, scored after the mask:
 
 | key | vehicle | duplicate | part | only | other | not judged | duplicate change | part change | lost | lost nested | only lost | fit lost |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| baseline | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain080_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| contain090_same | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| baseline | 22267 | 3931 | 979 | 294 | 2367 | 0 | +0 | +0 | 0 | 0 | 0 | 0 |
+| contain080 | 21209 | 1356 | 148 | 302 | 2142 | 0 | -2575 | -831 | 1058 | 493 | 6 | 376 |
+| contain090 | 21503 | 1618 | 243 | 305 | 2193 | 0 | -2313 | -736 | 764 | 326 | 2 | 360 |
+| contain080_same | 21711 | 1366 | 157 | 302 | 2147 | 0 | -2565 | -822 | 556 | 41 | 6 | 382 |
+| contain090_same | 21822 | 1625 | 252 | 305 | 2194 | 0 | -2306 | -727 | 445 | 32 | 2 | 366 |
 | birth040 | unchanged (tracker setting) | | | | | | | | | | | |
 | birth050 | unchanged (tracker setting) | | | | | | | | | | | |
-| nms050 | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| nms050 | 21810 | 374 | 729 | 382 | 1847 | 0 | -3557 | -250 | 469 | 5 | 0 | 478 |
 
-Vehicle-frames lost against the baseline, by vehicle: TBD.
+Vehicle-frames lost against the baseline, by vehicle (vehicle: frames), MVI_40855:
+
+| key | lost | lost nested | only lost | fit lost |
+|---|---|---|---|---|
+| contain080 | 5: 62, 6: 42, 7: 358, 8: 6, 9: 5, 10: 87, 13: 73, 15: 37, 17: 1, 18: 10, 19: 45, 20: 53, 21: 17, 22: 3, 24: 40, 31: 10, 33: 37, 36: 2, 37: 6, 41: 3, 42: 8, 43: 37, 44: 43, 45: 69, 46: 1, 47: 3 | 7: 341, 19: 30, 20: 4, 24: 38, 33: 32, 43: 23, 45: 25 | 10: 2, 18: 1, 41: 1, 42: 2 | 4: 4, 5: 76, 6: 11, 8: 28, 9: 11, 10: 28, 13: 4, 15: 65, 17: 1, 18: 1, 19: 3, 20: 11, 21: 5, 24: 4, 31: 23, 33: 14, 36: 3, 37: 1, 42: 1, 43: 1, 44: 6, 45: 74, 50: 1 |
+| contain090 | 5: 58, 6: 42, 7: 191, 8: 5, 9: 4, 10: 47, 13: 73, 15: 35, 17: 1, 18: 9, 19: 40, 20: 35, 21: 2, 22: 2, 24: 34, 31: 7, 33: 33, 36: 2, 37: 6, 41: 1, 42: 6, 43: 35, 44: 28, 45: 64, 46: 1, 47: 3 | 7: 188, 19: 28, 20: 1, 24: 33, 33: 30, 43: 23, 45: 23 | 10: 1, 42: 1 | 4: 4, 5: 76, 6: 11, 8: 28, 9: 12, 10: 24, 13: 4, 15: 63, 17: 1, 18: 1, 19: 3, 20: 9, 21: 1, 24: 4, 31: 20, 33: 14, 36: 3, 37: 1, 43: 1, 44: 5, 45: 74, 50: 1 |
+| contain080_same | 5: 62, 6: 38, 7: 32, 8: 6, 9: 5, 10: 87, 13: 73, 15: 37, 17: 1, 18: 10, 19: 14, 20: 46, 21: 17, 22: 3, 24: 2, 31: 10, 36: 2, 37: 6, 41: 3, 42: 8, 43: 5, 44: 43, 45: 42, 46: 1, 47: 3 | 7: 32, 19: 6, 43: 2, 45: 1 | 10: 2, 18: 1, 41: 1, 42: 2 | 4: 4, 5: 76, 6: 11, 8: 28, 9: 11, 10: 28, 13: 4, 15: 65, 17: 1, 18: 1, 19: 3, 20: 11, 21: 5, 24: 4, 31: 23, 33: 14, 36: 3, 37: 1, 42: 1, 43: 1, 44: 6, 45: 80, 50: 1 |
+| contain090_same | 5: 58, 6: 38, 7: 25, 8: 5, 9: 4, 10: 47, 13: 73, 15: 35, 17: 1, 18: 9, 19: 11, 20: 34, 21: 2, 22: 2, 24: 1, 31: 7, 36: 2, 37: 6, 41: 1, 42: 6, 43: 5, 44: 28, 45: 41, 46: 1, 47: 3 | 7: 25, 19: 4, 43: 2, 45: 1 | 10: 1, 42: 1 | 4: 4, 5: 76, 6: 11, 8: 28, 9: 12, 10: 24, 13: 4, 15: 63, 17: 1, 18: 1, 19: 3, 20: 9, 21: 1, 24: 4, 31: 20, 33: 14, 36: 3, 37: 1, 43: 1, 44: 5, 45: 80, 50: 1 |
+| nms050 | 5: 40, 6: 17, 8: 30, 9: 4, 10: 23, 13: 67, 15: 23, 17: 2, 18: 9, 19: 1, 20: 46, 21: 6, 22: 14, 23: 4, 31: 98, 37: 10, 41: 13, 42: 6, 43: 2, 44: 28, 45: 22, 46: 1, 47: 3 | 19: 1, 20: 2, 43: 2 | 0 | 4: 4, 5: 75, 6: 11, 8: 27, 9: 15, 10: 27, 13: 25, 14: 2, 15: 123, 16: 3, 17: 5, 18: 1, 19: 1, 20: 6, 21: 5, 24: 4, 31: 10, 33: 13, 36: 8, 37: 2, 41: 9, 42: 1, 43: 3, 44: 18, 45: 79, 50: 1 |
+
+The birth steps change no detection and lose no vehicle-frame. Each step that changes detections takes out duplicates
+and parts per detection and loses vehicle-frames: contain080 1058, 493 nested, the most on vehicle 7 (358, 341
+nested); contain090 764, 326 nested, the most on vehicle 7 (191, 188 nested); contain080_same 556, 41 nested, the most
+on vehicle 10 (87), with 32 of vehicle 7's; contain090_same 445, 32 nested, the most on vehicle 13 (73), with 25 of
+vehicle 7's; nms050 469, 5 nested, the most on vehicle 31 (98). Besides those, contain080, contain090,
+contain080_same, contain090_same and nms050 lose 6, 2, 6, 2 and 0 only boxes, and 376, 360, 382, 366 and 478
+vehicle-frames are fit lost.
 
 The rule on this clip, counter at its defaults; conditions 3 and 4 are MTID's, under Results:
 
 | candidate | 1. MVI_40855: the baseline's 23 still found | 2. MVI_40855: under 2 extra | qualifies | lost vehicle-frames, MVI_40855 + MTID |
 |---|---|---|---|---|
-| contain080 | TBD | TBD | TBD | TBD |
-| contain090 | TBD | TBD | TBD | TBD |
-| contain080_same | TBD | TBD | TBD | TBD |
-| contain090_same | TBD | TBD | TBD | TBD |
-| birth040 | TBD | TBD | TBD | TBD |
-| birth050 | TBD | TBD | TBD | TBD |
-| nms050 | TBD | TBD | TBD | TBD |
+| contain080 | yes: 23 found, none missed | yes: 1 | yes | 1058 + 47 = 1105 |
+| contain090 | yes: 23 found, none missed | no: 2 | no | 764 + 35 = 799 |
+| contain080_same | yes: 23 found, none missed | yes: 1 | yes | 556 + 13 = 569 |
+| contain090_same | yes: 23 found, none missed | yes: 1 | yes | 445 + 8 = 453 |
+| birth040 | yes: 23 found, none missed | yes: 0 | yes | 0 |
+| birth050 | yes: 23 found, none missed | yes: 0 | yes | 0 |
+| nms050 | yes: 23 found, none missed | yes: 1 | yes | 469 + 9 = 478 |
 
-Winner on this clip: TBD.
+**Winner on this clip, by the rule above: birth040 and birth050, joint winners, none preferred.** Conditions 3 and 4
+are carried from Results, where every step meets them; no step was run on MTID again. Every step keeps the baseline's
+23 found vehicles, so condition 1 holds for all seven. contain090 has 2 extra enters, not fewer than the baseline's 2,
+so it does not qualify; the other six do. The fewest extra enters among them is 0, shared by birth040 and birth050
+(contain080, contain080_same, contain090_same and nms050 have 1 each). The tie goes to the fewer lost vehicle-frames:
+both birth steps change no detection, 0 and 0, so the tie stands and they are joint winners.
 
-Per enter, MVI_40855, counter at its defaults:
+The question stated before the run: contain090_same, the winner on MVI_40714, qualifies on this clip and has 1 extra
+enter against the baseline's 2; birth040 and birth050 beat it under the rule, with 0. The result on MVI_40714 stands as
+declared. Neither winner is a fix for second boxes here: the baseline has no second-box enter, and the 2 extra enters
+the winners remove lie on no annotated box. As a no-harm replication, with the counter at its defaults: no step loses a
+found vehicle, no step adds a second-box enter (a duplicate or a part), and contain090 adds an again enter.
+
+**Per enter, MVI_40855, counter at its defaults.** The baseline's 2 extra enters, track 69 (frame 17, 680 ms) and track
+230 (frame 101, 4040 ms), lie on no annotated box, so they are compared by time alone, as declared, from the `--dets`
+run's table `extras, min_travel_px 0`: one is kept when the step has an enter on no annotated box within 2000 ms of it,
+and the step's own track and time are in brackets. The rule reads time only, so a kept enter need not be on the same
+thing as the baseline's.
 
 | step | baseline extras removed (tracks 69 and 230, no annotated box) | baseline extras kept | new extras, by kind | found vehicles lost |
 |---|---|---|---|---|
-| contain080 | TBD | TBD | TBD | TBD |
-| contain090 | TBD | TBD | TBD | TBD |
-| contain080_same | TBD | TBD | TBD | TBD |
-| contain090_same | TBD | TBD | TBD | TBD |
-| birth040 | TBD | TBD | TBD | TBD |
-| birth050 | TBD | TBD | TBD | TBD |
-| nms050 | TBD | TBD | TBD | TBD |
+| contain080 | 1: 69 | 230 (221, 4040 ms) | 0 | none |
+| contain090 | 1: 69 | 230 (234, 4040 ms) | again: 428 on vehicle 7, 9960 ms | none |
+| contain080_same | 1: 69 | 230 (222, 4040 ms) | 0 | none |
+| contain090_same | 1: 69 | 230 (229, 4040 ms) | 0 | none |
+| birth040 | 2: 69, 230 | none | 0 | none |
+| birth050 | 2: 69, 230 | none | 0 | none |
+| nms050 | 1: 230 | 69 (112, 1880 ms) | 0 | none |
+
+The four containment steps each have an enter on no annotated box in frame 101 (4040 ms), as track 230 does, and none
+at 680 ms. nms050's one, in frame 47 (1880 ms), lies within 2000 ms of track 69's 680 ms and not of track 230's 4040
+ms. No step's enter on no annotated box is new: each lies within 2000 ms of a baseline one. No step loses a found
+vehicle at the counter's defaults; under the zone rule every step loses vehicle 6 (above).
+
+**What did not work.**
+
+- contain090 does not qualify: it has 2 extra enters, as many as the baseline. It keeps track 230's by time and adds
+  an again enter on vehicle 7, its track 428 at 9960 ms.
+- Neither the containment steps nor nms050 remove both enters on no annotated box: each keeps one by time.
+  contain090_same, the winner on MVI_40714, keeps track 230's.
+- Under the zone rule every step, the two winners included, misses vehicle 6, which the zone-rule baseline finds, and
+  adds an enter on no annotated box. The rule is read with the counter at its defaults, so this does not change the
+  outcome; it is one event, below.
+- Per detection each containment step and nms050 loses vehicle-frames (above); contain080 and contain090 lose the most
+  on vehicle 7, nearly all of them nested (341 of 358, 188 of 191).
+- No step can be called a fix for second boxes on this clip: its baseline has no second-box enter to remove.
+
+**Looked at after the results: the zone-rule row.** The seven rows at 30 px are one event, read after the
+results (the last command of Reproduce's MVI_40855 block prints the figures here, from the saved track files). Vehicles
+6 and 7 stand queued in the zone from the first frame, and for a stretch of early frames the detector also
+gives one car box over both of them. At the baseline that box starts a track of its own, track 69 (frames 13 to 87),
+whose footpoint never gets more than 14.0 px from where it started, so it never enters under the zone rule; at the
+counter's defaults it is the enter on no annotated box at 680 ms. Vehicle 6's own track, 19, keeps its tight box (none
+of its boxes before frame 385 is under IoU 0.5 with vehicle 6) and enters under the zone rule when the vehicle pulls
+away, in frame 385. In the steps no track of its own holds the box over both: the birth steps do not start one on it,
+the containment steps drop vehicle 6's tight box where the box over both scores higher, and nms050 drops the
+lower-scoring of the two only where they overlap at IoU 0.5 or more. So vehicle 6's track takes the box over both.
+Under birth040 its track 19's boxes before frame 385 are under IoU 0.5 with vehicle 6 in
+frames 15 to 34, 20 frames, and its footpoint first lies 30 px from where it started in frame 16, at IoU 0.37 with
+vehicle 6: the enter commits there, on a box matching no annotated box. That track is then inside the zone, so when
+vehicle 6 pulls away it does not enter again, and vehicle 6 is missed. The same change is why no step has an enter on
+no annotated box at 680 ms at the counter's defaults. This reading changes nothing above.
 
 ## In the live service (opt-in)
 
@@ -1258,10 +1345,12 @@ TBD until the runs.
 ## Limitations
 
 - One clip, one detector, one camera, 47.2 s, 27 visits. The headline figure rests on a single enter, and that enter's
-  box lies mostly on one car. A second clip, MVI_40855, is declared for the second-box steps (On a second clip, under
-  Fix); it has not been run, and its results are TBD. It cannot lift this caveat: its baseline has no second-box enter
-  (its 2 extra enters lie on no annotated box), so it shows whether a step keeps the 23 vehicles found there and adds
-  no second-box enter, not that the fix carries over.
+  box lies mostly on one car. A second clip, MVI_40855, has been run with the second-box steps (On a second clip, under
+  Fix). It cannot lift this caveat: its baseline has no second-box enter (its 2 extra enters lie on no annotated box),
+  so it shows whether a step keeps the 23 vehicles found there and adds no second-box enter, not that the fix carries
+  over. There, with the counter at its defaults, every step keeps the 23 and none adds a duplicate or part enter, and
+  contain090 adds an again enter; under the zone rule every step misses vehicle 6, one event (Results on the second
+  clip).
 - 11 of the 27 truth visits are vehicles already in the zone at the first frame. Under the zone rule they are stamped
   when they move, so the rule cannot be scored by time against this truth.
 - The truth carries enters only, no exits; visits are matched on enter time, greedily in time order, so the time match
@@ -1296,10 +1385,11 @@ TBD until the runs.
 - On MTID, part and only labels can be static objects the detector scores as vehicles (the phantom study's lane dashes
   and bins) lying under a passing vehicle's annotated box, which the rules cannot tell from a second box; MTID's part
   and only counts are not read as second boxes.
-- The second-box steps have been run on one clip, with one detector and one tracker (ByteTrack); MTID and the queue
-  fixture check only that a step does no harm. Their run on a second clip, MVI_40855, is declared and not run yet (On a
-  second clip): its results are TBD, and the two clips are not pooled. That clip's baseline has no second-box enter, so
-  it too can check only that a step does no harm.
+- The second-box steps are measured on one clip, MVI_40714, with one detector and one tracker (ByteTrack); MTID and
+  the queue fixture check only that a step does no harm. Their run on a second clip, MVI_40855 (On a second clip), can
+  check only that too, since that clip's baseline has no second-box enter, and the two clips are not pooled. On
+  MVI_40855 the declared rule gives birth040 and birth050 as joint winners, by removing its 2 enters on no annotated
+  box, which are not second boxes; contain090_same qualifies there with 1 extra enter.
 - The found set puts no time limit on a found enter: it is the vehicle's first matching enter whenever it commits,
   where the time match allows 2 s. A step that delays a vehicle's enter keeps that vehicle found.
 - The opt-in filter is checked live on MTID only (In the live service (opt-in)): three runs and a repeat of any invalid
@@ -1769,7 +1859,7 @@ print('MVI_40855 | annotated frames', min(x.frame for x in gt), max(x.frame for 
 print('   labels', {k: n[k] for k in SB.LABELS})
 print('   nested annotated vehicle-frames', len(nest), 'on', len({v for f, v in nest}), 'vehicles')"
 cd ..
-# NOT RUN YET: the second-box steps on MVI_40855, to run only after On a second clip is committed; they fill its Results
+# RUN on 2026-10-05: the second-box steps on MVI_40855, run only after On a second clip was committed; they fill Results
 # on the second clip. Edge image, CPU, no build and no download. First the gate: the versions and the model's hash, which
 # must be those under Results, and MTID dumped again at NMS IoU 0.7 (under runs/verify/), which must be byte-identical
 # to its saved detections; if either fails, no step runs. Then the clip dumped again at NMS IoU 0.5 and 0.7, the 0.7
@@ -1804,6 +1894,25 @@ else
   done
   cd ..
 fi
+# looked at after the results (Results on the second clip), host only, on the step tracks written above: the zone-rule
+# row. Vehicle 6's track (the one on it at frame 4) at the baseline and under birth040: the frame its footpoint first
+# lies 30 px from its start, its IoU with vehicle 6 there, and its frames before 385 under IoU 0.5 with vehicle 6; then
+# the baseline's track 69: its first and last frame and how far its footpoint gets from its start
+cd harness && python -c "
+import math; from replay.schema import read_tracks; from replay.trackers.greedy_iou import iou
+v6 = {g.frame: g.bbox for g in read_tracks('runs/MVI_40855.gt.jsonl') if g.track_id == 6}
+for key in ('baseline', 'birth040'):
+    tr = sorted(read_tracks(f'runs/secondbox/MVI_40855/{key}.jsonl'), key=lambda b: (b.frame, b.track_id))
+    tid = max((b for b in tr if b.frame == 4), key=lambda b: iou(b.bbox, v6[4])).track_id
+    t = [b for b in tr if b.track_id == tid]
+    far = next(b for b in t if math.dist(b.footpoint, t[0].footpoint) >= 30)
+    off = [b.frame for b in t if b.frame < 385 and iou(b.bbox, v6[b.frame]) < 0.5]
+    print(key, '| the track on vehicle 6 at frame 4:', tid, '| its footpoint first 30 px from its start in frame', far.frame,
+          'at IoU', round(iou(far.bbox, v6[far.frame]), 2), 'with vehicle 6 | its frames before 385 under IoU 0.5 with it:', len(off), off)
+    if key == 'baseline':
+        b = [x for x in tr if x.track_id == 69]
+        print('   track 69: frames', b[0].frame, 'to', b[-1].frame, '| its footpoint at most',
+              round(max(math.dist(x.footpoint, b[0].footpoint) for x in b), 1), 'px from its start')" && cd ..
 # NOT RUN YET: the live check on the clip under study, UA-DETRAC MVI_40714, declared under On the clip under study (In the
 # live service (opt-in)), whose results stay TBD until the runs. Local only: the clip and its zone go to compose (VIDEO,
 # ZONE_POLYGON) on the make up-video line only, never exported. Its files go under harness/runs/live-MVI_40714 (gitignored);
