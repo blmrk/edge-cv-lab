@@ -6,7 +6,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 
 | Piece | State |
 |---|---|
-| Replay harness, 233 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
+| Replay harness, 268 tests (`make test`) | green locally; TrackEval tests skip without the `.cache/TrackEval` clone, the `bytetrack` adapter tests without numpy (CI installs `[dev]` only) |
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
@@ -18,6 +18,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
 | `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run in the edge image on MVI_40714 and MTID, every step (`--dets`, both clips dumped again at NMS IoU 0.7 and 0.5), and on the host on the saved baseline files (`--tracks`); results in `docs/case-study-straddles.md` |
+| Opt-in second-box filter in the edge (`CONTAIN_SHARE=0.9` with `CONTAIN_SAME_CLASS=1` is contain090_same, before ByteTrack; off by default) | tested on the host (`harness/tests/test_edge.py`); checked live on MTID only: off, on, off on one image, every run valid, (a) to (c) pass (`docs/case-study-straddles.md`, In the live service (opt-in)); its effect on enters measured in the replay harness only |
 
 ## Case studies
 
@@ -29,7 +30,7 @@ kind has a follow-up study of its own (task C, closed):
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is measured in `docs/case-study-straddles.md` |
-| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | done: `docs/case-study-straddles.md`; straddles are a measured negative on the clip, the fix moved to second boxes, and by a rule declared in advance contain090_same wins, in the replay harness only (task C, closed) |
+| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | done: `docs/case-study-straddles.md`; straddles are a measured negative on the clip, the fix moved to second boxes, and by a rule declared in advance contain090_same wins, in the replay harness only (task C, closed); opt-in in the edge since 2026-10-05, checked live on MTID only |
 | Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
@@ -40,9 +41,6 @@ Empty. Task C closed on 2026-10-05 on the replay result (Done 14 and 15); what w
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.
 - boxmot adapter: `pip install boxmot`, fix `update()` columns, add `boxmot_bytetrack` and `boxmot_ocsort` rows.
 - Published tracker (FastTracker or UCMCTrack) through `replay.motformat` and `scripts/trackeval_run.py`.
-- Shipping the second-box filter: a step between detection and tracking in the edge service, which
-  `model.track()` in `services/edge/src/main.py` does not offer; then the live edge on a clip. Not built,
-  not measured.
 - The second-box steps on another annotated clip: the result is one clip, one detector, one tracker.
 - The candidate straddle fix (drop a box mostly covered by two higher-scoring boxes, keeping a car seen in
   the gap between two nearer ones): no enter on MVI_40714 sits on a box across two separate vehicles, so
@@ -76,6 +74,15 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
     before any step ran; an independent re-derivation agreed on every table. By the declared rule contain090_same wins,
     measured in the replay harness only: extra enters 9 to 2, 6 of the 8 second-box enters removed, none added, every
     vehicle the baseline found still found. `docs/case-study-straddles.md`, Fix and Results.
+16. The second-box filter in the edge, opt-in and off by default: `CONTAIN_SHARE` and `CONTAIN_SAME_CLASS` in compose
+    (`CONTAIN_SHARE=0.9` is contain090_same). On, the edge runs `model.predict()` at `conf` 0.1, drops second boxes
+    with `replay.secondbox.contained`, then updates one replay `bytetrack` tracker on every frame; off, it runs
+    `model.track()` as before. `harness/tests/test_edge.py` drives `main()` on the host. A live check, declared and
+    committed before any run, ran on 2026-10-05 on MTID only: off, on, off on one image, CPU; every run valid, and (a)
+    filter active, (b) throughput and (c) gross harm pass. It checks that the opt-in path runs and does no gross harm,
+    not that the fix carries over: on MTID the replay gives contain090_same the baseline's counts, the live edge has not
+    run on a clip where the filter removes an enter, and the filter's effect on enters is measured in the replay harness
+    only. `docs/case-study-straddles.md`, In the live service (opt-in).
 
 ## Known rough edges
 - The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard (now
@@ -83,6 +90,10 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
   Occupancy comes only from the opt-in gauge; `make delivery` checks delivery.
 - The edge calls `counter.update()` only on frames with track boxes, so `expire()` waits for the next detected vehicle;
   on a quiet camera a lost visit stays open until then.
+- With `CONTAIN_SHARE` on, `TRACKER` is not used: the on path always runs `bytetrack.yaml`'s defaults through the
+  replay adapter, and the edge exits at start when `TRACKER` is set to anything but `bytetrack.yaml`.
+- The filter's live check ran on MTID only, where the replay gives contain090_same the baseline's counts: it shows the
+  opt-in path runs and does no gross harm, not that the fix carries over (`docs/case-study-straddles.md`).
 - `bytetrack` (the replay tracker) is written against `BYTETracker(args)` in ultralytics 8.4.163, the edge image's version
   on 2026-09-28, and runs on 8.4.170, the version the image pins since 2026-10-05 with torch 2.14.1. The pinned image
   was rebuilt on 2026-10-05 (`docker compose --profile video build edge`): it reports 8.4.170 and 2.14.1+cpu, and a
