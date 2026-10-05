@@ -66,6 +66,8 @@ services:
       ZONE_POLYGON: "[[552,112],[334,235],[882,581],[1020,277]]"  # = harness/zone.json, drawn in tools/label.html on media/sample.mp4
       MIN_TRAVEL_PX: "${MIN_TRAVEL_PX:-0}"            # 0 = off; 30 keeps static phantoms out (docs/case-study-phantoms.md)
       OCCUPANCY_GAUGE_MS: "${OCCUPANCY_GAUGE_MS:-0}"  # 0 = off; 500 publishes vehicles in zone (docs/case-study-balance.md)
+      CONTAIN_SHARE: "${CONTAIN_SHARE:-0}"            # 0 = off; 0.9 drops a box 0.9 inside a higher-scoring one (docs/case-study-straddles.md)
+      CONTAIN_SAME_CLASS: "${CONTAIN_SAME_CLASS:-1}"  # 1 = only inside a box of its own class (contain090_same); 0 = any class
     mem_limit: 2g   # lower this to reproduce OOM crash loops
     restart: unless-stopped
 
