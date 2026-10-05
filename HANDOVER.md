@@ -10,6 +10,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 | Fixtures (boundary jitter, shadow, 24-car traffic, 6-car queue) | reproducible, checked in |
 | Visuals: compare.gif, trackers.gif, timeline, heatmap, trajectories, spacetime | generated from fixtures via `make visuals` / `make trackers` |
 | Real-footage GIF `docs/footage/real-compare.gif` | `make footage`, from the per-class NMS detections |
+| Real-footage GIF `docs/footage/real-after.gif` | `make footage-after`, in the edge image, from the class-agnostic NMS detections (runs/dets.agnostic.jsonl) |
 | Tracker bench: greedy_iou, groundplane, ByteTrack (Ultralytics, from video or `bytetrack` on saved detections), MOT bridge, TrackEval runner | tested; **boxmot adapter untested** (needs torch) |
 | Compose stack, sim profile, Grafana dashboard | booted and working; `GRAFANA_PORT=3001 make up` if 3000 is taken; opt-in occupancy gauge (`OCCUPANCY_GAUGE_MS=500`) checked on the sim and run live on the video edge (MTID clip, with and without `MIN_TRAVEL_PX=30`) |
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
@@ -121,8 +122,8 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
 - `DebouncedZoneCounter.min_travel_px` defaults to 0; the edge and the sim run without it. Its trade-off: a vehicle
   standing in the zone when its track starts is counted only once it moves.
 - The counting study's baseline, ablation tables, first tracker table, the README's 78/39/21 and `real-compare.gif`
-  use per-class NMS detections (`--per-class-nms`, runs/dets.jsonl). The dump scripts and the edge default to
-  class-agnostic NMS.
+  use per-class NMS detections (`--per-class-nms`, runs/dets.jsonl). The dump scripts, the edge and `real-after.gif`
+  default to class-agnostic NMS.
 - The sim and the edge ignore `publish()`'s return code: when the bounded outgoing store (5000) is full, events past
   the limit are dropped with no log line. Not reached in the drills.
 - Ingest does not count the duplicates its `ON CONFLICT` turns away, so redeliveries are not measured.

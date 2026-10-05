@@ -90,7 +90,7 @@ Every clip, with URL, author and licence, is logged in [media/SOURCES.md](media/
 
 | Source | Licence | Where it shows up | Shipping it commercially |
 |---|---|---|---|
-| MTID (`media/SOURCES.md:8`) | CC BY 4.0 | `docs/footage/real-compare.gif` is rendered from it | CC BY 4.0 requires attribution (authors, licence, link, changes noted) wherever the GIF goes; this repository also adds a citation (`media/SOURCES.md:8`, "Shown publicly?"). The GIF is also under the docs' CC BY-NC-SA 4.0 |
+| MTID (`media/SOURCES.md:8`) | CC BY 4.0 | `docs/footage/real-compare.gif` and `docs/footage/real-after.gif` are rendered from it | CC BY 4.0 requires attribution (authors, licence, link, changes noted) wherever the GIFs go; this repository also adds a citation (`media/SOURCES.md:8`, "Shown publicly?"). The GIFs are also under the docs' CC BY-NC-SA 4.0 |
 | Vecteezy 6434705 (`:9`) | Vecteezy Free License, attribution required | metrics only | Credit required |
 | UA-DETRAC (`:11-12`), MOT17 (`:13`) | CC BY-NC-SA 3.0 (UA-DETRAC: academic use only) | metrics and citations only, no frames | Non-commercial: not for commercial use |
 
