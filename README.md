@@ -91,7 +91,7 @@ make counts          # enter/exit totals per counter
 # opt-in: OCCUPANCY_GAUGE_MS=500 make up fills the "Vehicles in zone (gauge, opt-in)" panel (empty by default; docs/case-study-balance.md)
 ```
 
-Grafana: http://localhost:3000 (no login; it queries Postgres through a role that reads the lab tables, no table writes; admin / lab to edit; `GRAFANA_PORT=3001 make up` if 3000 is taken). EMQX: http://localhost:18083 (admin / public, or `EMQX_DASHBOARD_PASSWORD` if set when the lab first starts, with no `#` in it; `make down` before changing it). Grafana, EMQX, Toxiproxy (8474) and Postgres (5432) are published on localhost only, which keeps other hosts out on Docker Engine 28.0.0 or later (older engines let hosts on the same network segment reach them; SECURITY.md); `LAB_BIND=0.0.0.0 make up` publishes them on every interface. A lab started before `db/init.sql` existed needs `make down` once: Postgres runs that script only on an empty volume.
+Grafana: http://localhost:3000 (no login; it queries Postgres through a role that reads the lab tables, no table writes; admin / lab to edit; `GRAFANA_PORT=3001 make up` if 3000 is taken). EMQX: http://localhost:18083 (admin / public, or `EMQX_DASHBOARD_PASSWORD` if set when the lab first starts, with no `#` in it; `make down` before changing it). Grafana, EMQX, Toxiproxy (8474) and Postgres (5432) are published on localhost only, which keeps other hosts out on Docker Engine 28.0.0 or later (older engines let hosts on the same network segment reach them; SECURITY.md); `LAB_BIND=0.0.0.0 make up` publishes them on every interface. A lab whose volume predates the current `db/init.sql` needs `make down` once: Postgres runs that script only on an empty volume.
 
 **Full lab with real video:**
 
