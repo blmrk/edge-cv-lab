@@ -2270,11 +2270,11 @@ for i, r in enumerate(rows, 1): print(i, '|', ' | '.join(map(str, r[:5])))" && c
 #   30 | MVI_39361 | 2030 | 10250 | 114 | 63
 #   31 | MVI_40792 | 1810 | 7798 | 0 | 28
 #   32 | MVI_39031 | 1470 | 6693 | 0 | 3
-# RUN only after On a third clip was committed with its Candidates line and its amendment; not yet run. First the
-# zones of all 3 candidates, before any candidate's mp4 is fetched or any detection of any candidate is dumped: for each
-# candidate in the declared order, NAME set to it, its XML (fetched for the ranking) copied, its original first, middle
-# and last JPEGs fetched from the mirror (byte sizes and sha256 recorded in media/SOURCES.md), then the annotated boxes
-# and ignored regions.
+# RUN only after On a third clip was committed with its Candidates line and its amendment; RUN on 2026-10-06 down to the
+# STOP line, NAME set to MVI_40863, MVI_40742 and MVI_40864 in that order. First the zones of all 3 candidates, before
+# any candidate's mp4 is fetched or any detection of any candidate is dumped: for each candidate in the declared order,
+# NAME set to it, its XML (fetched for the ranking) copied, its original first, middle and last JPEGs fetched from the
+# mirror (byte sizes and sha256 recorded in media/SOURCES.md), then the annotated boxes and ignored regions.
 NAME=MVI_NNNNN  # each candidate in turn, from the Candidates line
 cp media/UA-DETRAC/test-xml/$NAME.xml media/UA-DETRAC/$NAME.xml
 N=$(python3 -c "import xml.etree.ElementTree as E; print(len(E.parse('media/UA-DETRAC/$NAME.xml').getroot().findall('frame')))")
@@ -2288,7 +2288,7 @@ shasum -a 256 media/UA-DETRAC/$NAME.xml $C/*.jpg
 cd harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/$NAME.xml --out runs/$NAME && cd ..
 # the zone, drawn from the three JPEGs and runs/$NAME.gt.jsonl only. First, the detector output for NAME already on disk
 # (must print 0). Then one polygon on each approach or carriageway the annotated vehicles drive into, at most 3 tried per
-# road: polygon K (1, 2, ...) written to runs/$NAME.zone.K.json, POLYGON_K its vertices, [[x, y], ...], one echo line
+# road: polygon K (1, 2, ...) written to runs/$NAME.zone.K.json, its vertices in its echo line, [[x, y], ...], one echo line
 # per polygon tried. Each polygon's checks, on the annotations alone: the visits, the vehicles already in it at the
 # first frame, classes, ignored regions; its pixels in an ignored region (must be 0); the visit count with each edge
 # moved 5 px out and in along its normal (each must equal the visits); the mean y of its vertices, for the tie. The zone
@@ -2298,7 +2298,28 @@ cd harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/$NAME.xml 
 cd harness
 python -c "import glob; print('$NAME detector output on disk:',
       len(glob.glob('runs/$NAME.dets*') + glob.glob('runs/$NAME.bytetrack*') + glob.glob('runs/secondbox/$NAME')), '(must be 0)')"
-echo '{"polygon": POLYGON_K, "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' > runs/$NAME.zone.K.json
+case $NAME in  # the polygons tried, one echo line each in the order tried, the road in the comment; K, the zone
+  MVI_40863)  # 1 the near lanes, below the railing; 2 the far lanes, beyond it. The zone: K=2
+    echo '{"polygon": [[450, 230], [850, 306], [850, 535], [630, 530], [450, 450]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.1.json
+    echo '{"polygon": [[500, 125], [810, 140], [810, 299], [500, 240]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.2.json
+    K=2;;
+  MVI_40742)  # 1 the near carriageway; 2 the middle carriageway, between the two railings. The zone: K=1
+    echo '{"polygon": [[268, 272], [690, 435], [480, 540], [372, 540], [170, 421]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.1.json
+    echo '{"polygon": [[400, 130], [446, 130], [447, 160], [644, 160], [645, 190], [700, 190], [700, 439], [400, 323]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.2.json
+    K=1;;
+  MVI_40864)  # 1 the near lanes, below the railing; 2 the far lanes, up to the median; 3 the road beyond it. The zone: K=2
+    echo '{"polygon": [[320, 197], [640, 251], [550, 540], [320, 440]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.1.json
+    echo '{"polygon": [[340, 112], [740, 131], [740, 294], [340, 214]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.2.json
+    echo '{"polygon": [[440, 68], [665, 68], [665, 154], [440, 135]], "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' \
+      > runs/$NAME.zone.3.json
+    K=2;;
+esac
 for Z in runs/$NAME.zone.[0-9]*.json; do python -c "
 import json, math
 from replay.geometry import point_in_polygon; from replay.schema import read_tracks; from replay.zones import DebouncedZoneCounter, run
@@ -2322,10 +2343,10 @@ for i in range(n):
 print('visits with each of the', n, 'edges moved 5 px either way along its normal:', shift, '| all equal to the visits:',
       set(shift) == {len(en)})"
 done
-cp runs/$NAME.zone.K.json runs/$NAME.zone.json  # K: the zone's polygon
+cp runs/$NAME.zone.$K.json runs/$NAME.zone.json  # K: the zone's polygon, set in the case above
 python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/$NAME.xml --out runs/$NAME --zone runs/$NAME.zone.json
 cd ..
-# STOP: the main session commits the 3 candidates' zones (the echo lines above, every POLYGON_K tried filled in, and the
+# STOP: the main session commits the 3 candidates' zones (the echo lines above, every polygon tried, in the case block above, and the
 # K of each zone) before any line below runs. Once committed, a zone is not redrawn, moved or replaced after any of its
 # candidate's detections exist, whatever its baseline gives, and a candidate whose baseline falls short of the bar is
 # not run again with another zone.
