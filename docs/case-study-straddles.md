@@ -933,6 +933,128 @@ vehicle 6: the enter commits there, on a box matching no annotated box. That tra
 vehicle 6 pulls away it does not enter again, and vehicle 6 is missed. The same change is why no step has an enter on
 no annotated box at 680 ms at the counter's defaults. This reading changes nothing above.
 
+### On a third clip
+
+The result above rests on MVI_40714: MVI_40855's baseline has no second-box enter, so the steps ran there as a no-harm
+replication (On a second clip), and what they do to second-box enters has been seen on one clip only. This part
+declares one more clip, chosen for the presence of second-box enters at its baseline, so that the per-enter effect of
+the steps is seen off MVI_40714. The clip is chosen on its baseline, never on any step's result: the candidates are put
+in an order fixed below from their annotations alone, the baseline is run on each candidate in that order, and the
+search stops at the first that qualifies. No step runs on a candidate before it has qualified. This part is committed
+before any candidate's XML or mp4 is fetched, and no result changes it.
+
+**Candidate pool.** The 40 UA-DETRAC test sequences on the Kaggle mirror `longhn0108/ua-detrac-video-test`, by the
+names `kaggle datasets files` lists, each with its XML on `sudharsannv/detrac-xml` (the ranking in Reproduce checks that
+the two listings name the same sequences), less MVI_40714 and MVI_40855 and less the other sequences of their two camera
+sites. A site is told by a name rule, the sequence-number block: the name less its last digit, MVI_4071x for MVI_40714
+and MVI_4085x for MVI_40855, which on the listing takes out MVI_40711, MVI_40712 and MVI_40714, and MVI_40851 to
+MVI_40855. The rule assumes that a block is one camera site and is not checked against the frames: a sequence of another
+block filmed by one of the two cameras would stay in the pool.
+
+**Selection statistic**, computed from the test XMLs alone, before any mp4 is fetched: S, the bus vehicle-frames, the
+number of annotated boxes of class bus in the whole sequence, one per vehicle per frame, after the boxes centred in an
+ignored region are dropped as `scripts/detrac_to_gt.py` drops them. With B the annotated boxes `detrac_to_gt.py` keeps,
+each a vehicle v in a frame f, and c(f, v) the class the XML's `vehicle_type` gives v in frame f:
+`S = |{(f, v) in B : c(f, v) = "bus"}|`. The candidates are taken from the highest S down. A tie goes to the higher N,
+the nested annotated vehicle-frames of the per-detection tables above, computed by the same code
+(`replay.secondbox.nested`) on the same boxes: `N = |{(f, v) in B : another box of frame f holds 0.8 or more of the
+area of v's box}|`; a tie after that goes to the name, in ascending order.
+
+Why buses. A second box is a second detection on a vehicle that already has one, and a long vehicle leaves room for it:
+a box on its front or rear beside one on all of it, or two boxes on it that overlap too little for NMS at IoU 0.7 to
+merge them. On MVI_40714 the second-box enters were duplicates 9 and 543 and part 550 on bus 27, duplicate 749 and part
+726 on bus 30, part 750 on car 25, whose box lies mostly inside bus 30's, and duplicates 453 and 592 on cars 12 and 17.
+The class is read from the XML, so S sets no size threshold. Of the other classes in the annotations (car, van,
+others), others is not counted: what it holds is not checked here. The tie key is the other way second boxes arise in
+the study, one vehicle partly covering another, as car 25 lies inside bus 30. N is not the statistic because on the two
+study clips it does not order them by second-box enters: MVI_40855 has 2421 nested annotated vehicle-frames and no
+second-box enter at its baseline, MVI_40714 has 642 and 8 second-box enters. That choice was made with those figures in
+view; S has not been computed on either study clip. What S cannot see: whether the buses come near the zone, which is
+drawn later; whether the detector gives them second boxes, and whether those start tracks; a close car, large in the
+frame, adds nothing, and a far bus adds as much as a near one. S sets the order in which candidates are fetched; their
+baselines decide.
+
+Candidates: (filled by the ranking, below)
+
+**Qualification.** The candidates are taken in that order. For each, the mp4, the three check JPEGs and the XML are
+fetched and lined up, the zone is drawn and committed (below), the image gate is passed, and the baseline is run:
+ByteTrack at its defaults on the clip's class-agnostic NMS detections at the study's settings (yolov8n, conf 0.1, NMS
+IoU 0.7, the dump script's defaults, at 25 fps), the debounced counter at its defaults, each enter put down by vehicle
+on the saved files. The first candidate whose baseline has at least 3 second-box enters, its duplicate and part enters
+together, is the third clip, and no later candidate is fetched. Again enters are reported but do not count toward the
+3: an again is the same vehicle under a new ID or entering again, not a second box (Results). At most 3 candidates are
+fetched; one whose mp4 does not line up with its XML counts among the 3, is reported and is not run. If none of the 3
+qualifies, this part reports their baselines, by vehicle at 0 and 30 px and per detection, and stops: no step runs on
+any of them, and the bar is not lowered.
+
+At least 3 buys a result that rests on more than one or two enters. Per enter, a step's result is which of the
+baseline's second-box enters it removes and which it keeps, and with one or two of them that is one or two events (the
+headline figure on MVI_40714 rests on a single enter, Limitations). It costs in two ways. A clip picked because its
+baseline has many second-box enters is likely to hold some marginal ones, a box that starts a track in this run and
+would not after a small change, and any step that changes the detections or the tracker can remove those: on this clip
+the removed counts lean in the steps' favour, and they are read per enter, never as a rate. And the higher the bar, the
+likelier that none of the 3 qualifies and this part ends with no third clip.
+
+**Zone.** For each candidate, before its detections are dumped: a polygon over one approach or carriageway that the
+annotated vehicles drive into, as on the two study clips, drawn from the clip's frames (extracted locally, never
+committed) and the XML's annotated tracks only. It is placed to count the vehicles on that road, not around any vehicle
+or class, and S plays no part in it. No pixel of it may lie in an ignored region (checked on the integer pixel grid),
+and moving any one of its edges 5 px out or in along its normal must leave the visit count from the annotated tracks
+unchanged (Reproduce). If either check fails, the zone is redrawn from the frames and the XML only and both checks run
+again; every polygon tried is reported. The polygon goes into the Reproduce block below (`runs/NAME.zone.json`) and is
+committed by the main session before the clip's detections are dumped: unlike on MVI_40855, where the detections and
+the baseline tracks already existed when the zone was drawn, no detector output for the clip exists when its zone is
+chosen.
+
+**Truth, detections and tracks**, made with MVI_40855's commands with the names swapped (Reproduce). The mp4 is checked
+against its XML as in [datasets.md](datasets.md): `ffprobe -count_frames` must give the XML's frame count at 25 fps, and
+the original first, middle and last JPEGs must best match decoded frames n-1. `scripts/detrac_to_gt.py` gives the
+annotated boxes, the ignored regions and the visit truth (the debounced counter's defaults on the annotated tracks).
+Detections are dumped and ByteTrack replayed in the edge image, CPU. Before any candidate's detections are dumped, and
+again before the steps run, the second clip's image gate: the image must print Ultralytics 8.4.170, torch 2.14.1+cpu
+and the model sha256 under Results, and MTID dumped again at NMS IoU 0.7 must be byte-identical to
+`runs/dets.agnostic.jsonl`; if either fails, nothing is dumped or run and this part says so. The clip, its XML, its
+JPEGs and every file derived from them stay in the gitignored `media/` and `harness/runs/`, and each fetched candidate
+gets its row in `media/SOURCES.md`, whether it qualifies or not.
+
+**The steps and the winner rule.** The scorer, the seven steps with their parameters and the thresholds declared above
+apply unchanged, to this clip on its own; nms050 runs only if the clip dumped again at NMS IoU 0.7 is byte-identical to
+its saved detections, as on the second clip. Each step is scored as on the second clip: the visits table against the
+clip's truth visits, on enter time, 2 s tolerance; by vehicle at 0 and 30 px, with the extras removed and new against
+this clip's baseline at the same setting; per detection, for the steps that change detections, with the vehicles behind
+every loss; and the same checks before any row is read. The second clip's rule is kept, with the second-box clause
+restored: second-box enters are the duplicate and part enters, as under the declared design. With the counter at its
+defaults, a step qualifies when:
+
+1. The third clip by vehicle: every vehicle the baseline found is still found.
+2. The third clip by vehicle: fewer second-box enters than the baseline's, and no more extra enters than the
+   baseline's.
+3. MTID by vehicle, condition 3 as measured under Results, where every step meets it. No step is run on MTID again.
+4. MTID by `replay.score`, condition 4 as measured under Results, where every step meets it.
+
+The winner is the qualifying step with the fewest second-box enters on this clip; a tie goes to the fewer extra enters,
+then to the fewer lost vehicle-frames on this clip alone (a step that changes no detection counts 0); a tie after that
+gives joint winners, none preferred. If no step qualifies, the result on this clip is negative. A step is called a fix
+for second boxes on this clip only for the second-box enters it removes, less the new ones it adds, as under Results;
+an again enter it removes or adds is reported and counts toward no fix.
+
+**The question, stated before the run.** On the third clip, does contain090_same, the winner on MVI_40714, qualify and
+remove second-box enters? Does another step beat it under the rule above?
+
+**What the result may claim.** A per-enter account on one more clip: which of its baseline's second-box enters each
+step removes and which it keeps, which extras it adds and of what kind, and which found vehicles and vehicle-frames it
+loses. No rate, percentage or general claim: the clip was chosen because its baseline has second-box enters, so it
+shows what the steps do where the failure is present, not how often the failure occurs or how often a step removes it.
+The three clips are not pooled: no figure is summed or averaged across MVI_40714, MVI_40855 and this clip, and the
+results on MVI_40714 and MVI_40855 stand as declared, whatever this clip gives. If no candidate qualifies, the only
+claim is that none of the first 3 in the declared order has 3 second-box enters at its baseline.
+
+**Declared with both clips' results in view.** Written after the results on MVI_40714 and MVI_40855 above, and after
+the two mirrors' file listings (names and byte sizes) had been printed; before S was computed on any sequence, the two
+study clips included, before N was computed on any candidate, and before any candidate's XML, frames or mp4 was read.
+The statistic is computed by the python block in Reproduce, run after this part is committed; its top 3 fill the
+Candidates line, which is committed in turn before any mp4 is fetched.
+
 ## In the live service (opt-in)
 
 The winner, contain090_same, needs a step between detection and tracking, which `model.track()` does not offer
@@ -1991,6 +2113,184 @@ for key in ('baseline', 'birth040'):
         b = [x for x in tr if x.track_id == 69]
         print('   track 69: frames', b[0].frame, 'to', b[-1].frame, '| its footpoint at most',
               round(max(math.dist(x.footpoint, b[0].footpoint) for x in b), 1), 'px from its start')" && cd ..
+# The third clip (On a third clip, under Fix). From the repo root; every fetched file stays in the gitignored
+# media/UA-DETRAC/, every file derived from one in harness/runs/. RUN only after On a third clip was committed; not yet
+# run. First, before any mp4 is fetched: the two mirrors' listings, the pool's test XMLs (unzipped where the mirror
+# delivers one zipped; their byte sizes and sha256 recorded in media/SOURCES.md), then the ranking, whose top 3 fill the
+# Candidates line, committed before any mp4 is fetched.
+mkdir -p media/UA-DETRAC/test-xml
+kaggle datasets files longhn0108/ua-detrac-video-test --csv --page-size 200 > media/UA-DETRAC/listing-mp4.csv
+kaggle datasets files sudharsannv/detrac-xml --csv --page-size 200 > media/UA-DETRAC/listing-xml.csv
+for n in $(python3 -c "import csv
+print(*sorted(n for n in (r['name'][:-4] for r in csv.DictReader(open('media/UA-DETRAC/listing-mp4.csv'))) if n[:-1] not in ('MVI_4071', 'MVI_4085')))"); do
+  kaggle datasets download sudharsannv/detrac-xml -f DETRAC-Test-Annotations-XML/DETRAC-Test-Annotations-XML/$n.xml \
+    -p media/UA-DETRAC/test-xml -q
+done
+python3 -c "
+import pathlib, zipfile
+for z in sorted(pathlib.Path('media/UA-DETRAC/test-xml').glob('*.zip')):
+    zipfile.ZipFile(z).extractall(z.parent); z.unlink()"
+wc -c media/UA-DETRAC/test-xml/*.xml; shasum -a 256 media/UA-DETRAC/test-xml/*.xml
+# the ranking (On a third clip): S, bus vehicle-frames, from the highest down, then N, nested annotated vehicle-frames,
+# then the name; with the checks that the two listings name the same sequences and that each XML has the byte size its
+# listing gives. From the test XMLs alone
+cd harness && python -c "
+import csv, sys, xml.etree.ElementTree as ET; from pathlib import Path
+sys.path.insert(0, 'scripts'); from detrac_to_gt import convert; from replay.secondbox import nested
+U = Path('../media/UA-DETRAC')
+mp4 = sorted(r['name'][:-4] for r in csv.DictReader(open(U / 'listing-mp4.csv')) if r['name'].endswith('.mp4'))
+size = {r['name'].split('/')[-1][:-4]: int(r['size']) for r in csv.DictReader(open(U / 'listing-xml.csv'))
+        if r['name'].startswith('DETRAC-Test-Annotations-XML/')}
+pool = [n for n in mp4 if n[:-1] not in ('MVI_4071', 'MVI_4085')]
+print(len(mp4), 'test sequences | the XML listing names the same:', sorted(size) == mp4, '| out of the pool:',
+      [n for n in mp4 if n not in pool])
+rows = []
+for n in pool:
+    p = U / 'test-xml' / f'{n}.xml'; b = convert(p)[0]
+    rows.append((n, len(ET.parse(p).getroot().findall('frame')), len(b), sum(x.cls == 'bus' for x in b), len(nested(b)),
+                 p.stat().st_size == size[n]))
+rows.sort(key=lambda r: (-r[3], -r[4], r[0]))
+print(len(pool), 'in the pool | each XML the byte size its listing gives:', all(r[5] for r in rows))
+print('rank | name | annotated frames | boxes kept | S, bus vehicle-frames | N, nested annotated vehicle-frames')
+for i, r in enumerate(rows, 1): print(i, '|', ' | '.join(map(str, r[:5])))" && cd ..
+# RUN only after On a third clip was committed with its Candidates line filled; not yet run. One candidate at a time, in
+# the declared order, NAME set to it, until one qualifies or 3 have been fetched. The mp4 and the original first, middle
+# and last JPEGs from the mirrors (byte sizes and sha256 recorded in media/SOURCES.md), the frame count, and the
+# alignment check of docs/datasets.md with the names swapped; then the annotated boxes and ignored regions.
+NAME=MVI_NNNNN  # the candidate, from the Candidates line
+cp media/UA-DETRAC/test-xml/$NAME.xml media/UA-DETRAC/$NAME.xml
+kaggle datasets download longhn0108/ua-detrac-video-test -f $NAME.mp4 -p media/UA-DETRAC -q
+N=$(python3 -c "import xml.etree.ElementTree as E; print(len(E.parse('media/UA-DETRAC/$NAME.xml').getroot().findall('frame')))")
+C=media/UA-DETRAC/check-${NAME#MVI_}; mkdir -p $C
+for i in 1 $((N / 2)) $N; do
+  kaggle datasets download sudharsannv/detrac -f DETRAC-test-data/Insight-MVT_Annotation_Test/$NAME/img$(printf %05d $i).jpg \
+    -p $C -q
+done
+wc -c media/UA-DETRAC/$NAME.mp4 media/UA-DETRAC/$NAME.xml $C/*.jpg
+shasum -a 256 media/UA-DETRAC/$NAME.mp4 media/UA-DETRAC/$NAME.xml
+ffprobe -v error -count_frames -select_streams v:0 \
+  -show_entries stream=codec_name,width,height,r_frame_rate,nb_read_frames,duration media/UA-DETRAC/$NAME.mp4
+python3 -c "
+import cv2, numpy as np
+cap = cv2.VideoCapture('media/UA-DETRAC/$NAME.mp4'); frames = []
+while True:
+    ok, f = cap.read()
+    if not ok: break
+    frames.append(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY).astype(np.float32))
+print('XML frames', $N, '| decoded frames', len(frames))
+for n in (1, $N // 2, $N):
+    j = cv2.imread(f'$C/img{n:05d}.jpg', cv2.IMREAD_GRAYSCALE).astype(np.float32)
+    d = {k: round(float(np.abs(frames[k] - j).mean()), 2) for k in range(n - 3, n + 2) if 0 <= k < len(frames)}
+    print(f'img{n:05d}.jpg best matches decoded frame', min(d, key=d.get), d)"
+cd harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/$NAME.xml --out runs/$NAME && cd ..
+# the zone, drawn from the frames (extracted locally under media/UA-DETRAC/, never committed) and runs/$NAME.gt.jsonl
+# only, before any detection of the clip exists; POLYGON is its vertices, [[x, y], ...]. Then the visit truth and the
+# zone's checks, on the annotations alone: the visits, the vehicles already in the zone at the first frame, classes,
+# ignored regions; zone pixels in an ignored region (must be 0); the visit count with each edge moved 5 px out and in
+# along its normal (each must equal the visits)
+cd harness
+echo '{"polygon": POLYGON, "frame_size": [960, 540], "video": "UA-DETRAC/'$NAME'.mp4"}' > runs/$NAME.zone.json
+python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/$NAME.xml --out runs/$NAME --zone runs/$NAME.zone.json
+python -c "
+import json, math
+from replay.geometry import point_in_polygon; from replay.schema import read_tracks; from replay.zones import DebouncedZoneCounter, run
+poly = [tuple(p) for p in json.load(open('runs/$NAME.zone.json'))['polygon']]
+regions = json.load(open('runs/$NAME.ignored.json'))['regions_xyxy']
+gt = sorted(read_tracks('runs/$NAME.gt.jsonl'), key=lambda b: (b.frame, b.track_id))
+en = [e for e in run(DebouncedZoneCounter(poly), gt) if e.kind == 'enter']
+f0 = {g.track_id for g in gt if g.frame == 0 and point_in_polygon(g.footpoint, poly)}
+print('annotated frames', gt[0].frame, gt[-1].frame, '| classes', sorted({g.cls for g in gt}), '| ignored regions', len(regions))
+print('visits', len(en), '| footpoint in the zone at frame 0:', len(f0), '(id, enter ms)',
+      sorted((e.track_id, e.ts_ms) for e in en if e.track_id in f0), '| the other visits', sum(e.track_id not in f0 for e in en))
+print('zone pixels in an ignored region:', sum(point_in_polygon((x, y), poly) for x0, y0, x1, y1 in regions
+      for x in range(math.ceil(x0), math.floor(x1) + 1) for y in range(math.ceil(y0), math.floor(y1) + 1)))
+n, shift = len(poly), []
+for i in range(n):
+    (x0, y0), (x1, y1) = poly[i], poly[(i + 1) % n]; L = math.hypot(x1 - x0, y1 - y0)
+    for d in (-5, 5):
+        p = list(poly); p[i], p[(i + 1) % n] = [(x + d * (y1 - y0) / L, y - d * (x1 - x0) / L) for x, y in (poly[i], poly[(i + 1) % n])]
+        shift.append(sum(e.kind == 'enter' for e in run(DebouncedZoneCounter(p), gt)))
+print('visits with each of the', n, 'edges moved 5 px either way along its normal:', shift, '| all equal to the visits:',
+      set(shift) == {len(en)})"
+cd ..
+# STOP: the main session commits the zone (the echo line above, its POLYGON filled in) before any line below runs.
+# The gate, as for MVI_40855; only if it passes, the detections and ByteTrack in the edge image, CPU, no build, with
+# MVI_40855's commands and the names swapped
+e() { docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge "$@"; }
+e python -c "import hashlib, torch, ultralytics
+v = (ultralytics.__version__, str(torch.__version__), hashlib.sha256(open('/app/yolov8n.pt', 'rb').read()).hexdigest())
+print(*v); raise SystemExit(0 if v == ('8.4.170', '2.14.1+cpu', 'f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36') else 1)"; c0=$?
+e python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --iou 0.7 --out runs/verify/mtid.iou0.7.jsonl
+cmp harness/runs/verify/mtid.iou0.7.jsonl harness/runs/dets.agnostic.jsonl; c4=$?
+if [ "$c0" -ne 0 ] || [ "$c4" -ne 0 ]; then
+  echo "not the image under Results (versions, hash or the MTID 0.7 dump differ): nothing is dumped for $NAME"
+else
+  e python scripts/dump_detections.py --video ../media/UA-DETRAC/$NAME.mp4 --fps 25 --model /app/yolov8n.pt --out runs/$NAME.dets.jsonl
+  e python -m replay.track --dets runs/$NAME.dets.jsonl --tracker bytetrack --out runs/$NAME.bytetrack.jsonl
+fi
+# on the host, once the dumps above exist: ids and boxes; the baseline under the rules, each enter put down by vehicle
+# without and with the zone rule; each baseline detection labelled after the mask; then the qualification, counter at
+# its defaults: second-box enters (duplicate and part) against the declared 3, again enters shown and not counted
+cd harness
+python -c "import json; t = [json.loads(l) for l in open('runs/$NAME.bytetrack.jsonl')]; print(len({d['track_id'] for d in t}), 'ids', len(t), 'boxes')"
+for px in 0 30; do
+  python -m replay.secondbox --tracks runs/$NAME.bytetrack.jsonl --gt runs/$NAME.gt.jsonl --zone runs/$NAME.zone.json \
+    --min-travel-px $px
+done
+python -c "
+import json; from collections import Counter
+from replay import secondbox as SB; from replay.detections import read_detections; from replay.schema import read_tracks
+from replay.straddle import mask
+every, gt = read_detections('runs/$NAME.dets.jsonl'), list(read_tracks('runs/$NAME.gt.jsonl'))
+dets = mask(every, json.load(open('runs/$NAME.ignored.json'))['regions_xyxy'])  # the baseline's: no filter, then the mask
+n, nest = Counter(l for l, *_ in SB.classify(dets, gt)), SB.nested(gt)
+print('$NAME | annotated frames', min(x.frame for x in gt), max(x.frame for x in gt), '| detection frames',
+      min(x.frame for x in every), max(x.frame for x in every), '| detections', len(every), 'scored', len(dets),
+      '| centred in an ignored region', len(every) - len(dets), round((len(every) - len(dets)) / len(every), 3))
+print('   labels', {k: n[k] for k in SB.LABELS})
+print('   nested annotated vehicle-frames', len(nest), 'on', len({v for f, v in nest}), 'vehicles')"
+python -c "
+import json; from collections import Counter
+from replay.schema import read_tracks; from replay.secondbox import by_vehicle
+poly = [tuple(p) for p in json.load(open('runs/$NAME.zone.json'))['polygon']]
+rows, missed = by_vehicle(list(read_tracks('runs/$NAME.bytetrack.jsonl')), list(read_tracks('runs/$NAME.gt.jsonl')), poly)
+k = Counter(r['kind'] for r in rows); n = k['duplicate'] + k['part']
+print('$NAME baseline, counter at its defaults | duplicate', k['duplicate'], '| part', k['part'], '| again', k['again'],
+      '| second-box enters', n, '|', 'qualifies' if n >= 3 else 'does not qualify')"
+cd ..
+# RUN only after On a third clip was committed and NAME qualified above; not yet run. The second-box steps on NAME, as
+# MVI_40855's RUN block above with the names swapped: the gate again; the clip dumped again at NMS IoU 0.5 and 0.7, the
+# 0.7 dump compared byte for byte with the saved detections (if it differs, nms050 is dropped on this clip and no nms050
+# row is computed); every step, each step's tracks written under runs/secondbox/$NAME, and the baseline step's every
+# enter printed from its tracks in memory; the baseline step's tracks against the saved ones; then the by-vehicle
+# baseline above again, which must print the same.
+e() { docker run --rm -v "$PWD":/work -w /work/harness edge-cv-lab-edge "$@"; }
+e python -c "import hashlib, torch, ultralytics
+v = (ultralytics.__version__, str(torch.__version__), hashlib.sha256(open('/app/yolov8n.pt', 'rb').read()).hexdigest())
+print(*v); raise SystemExit(0 if v == ('8.4.170', '2.14.1+cpu', 'f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36') else 1)"; c0=$?
+e python scripts/dump_detections.py --video ../media/sample.mp4 --model /app/yolov8n.pt --iou 0.7 --out runs/verify/mtid.iou0.7.jsonl
+cmp harness/runs/verify/mtid.iou0.7.jsonl harness/runs/dets.agnostic.jsonl; c4=$?
+if [ "$c0" -ne 0 ] || [ "$c4" -ne 0 ]; then
+  echo "not the image under Results (versions, hash or the MTID 0.7 dump differ): no step runs on $NAME"
+else
+  for iou in 0.5 0.7; do
+    e python scripts/dump_detections.py --video ../media/UA-DETRAC/$NAME.mp4 --fps 25 --model /app/yolov8n.pt --iou $iou \
+      --out runs/$NAME.dets.iou$iou.jsonl
+  done
+  cmp harness/runs/$NAME.dets.iou0.7.jsonl harness/runs/$NAME.dets.jsonl; c3=$?
+  m3=()  # nms050 runs only when the 0.7 dump is byte-identical to the saved detections
+  if [ "$c3" -eq 0 ]; then m3=(--redetected nms050=runs/$NAME.dets.iou0.5.jsonl)
+  else echo "the $NAME 0.7 dump differs from the saved detections: nms050 dropped on this clip, no nms050 row computed"; fi
+  e python -m replay.secondbox --dets runs/$NAME.dets.jsonl --zone runs/$NAME.zone.json --truth runs/$NAME.truth.json \
+    --gt runs/$NAME.gt.jsonl --ignored runs/$NAME.ignored.json "${m3[@]}" --out-dir runs/secondbox/$NAME
+  cd harness
+  diff <(sort runs/secondbox/$NAME/baseline.jsonl) <(sort runs/$NAME.bytetrack.jsonl)
+  for px in 0 30; do
+    python -m replay.secondbox --tracks runs/$NAME.bytetrack.jsonl --gt runs/$NAME.gt.jsonl --zone runs/$NAME.zone.json \
+      --min-travel-px $px
+  done
+  cd ..
+fi
 # RUN on 2026-10-05, off1, on, off2, no repeat: the live check on the clip under study, UA-DETRAC MVI_40714, declared
 # under On the clip under study (In the live service (opt-in)), whose figures are under Results on MVI_40714. Local
 # only: the clip and its zone go to compose (VIDEO, ZONE_POLYGON) on the make up-video line only, never exported. Its
