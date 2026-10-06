@@ -20,7 +20,7 @@ Last updated 2026-10-06. Everything below has been run unless marked otherwise.
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
-| `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run in the edge image on MVI_40714 and MTID, every step (`--dets`, both clips dumped again at NMS IoU 0.7 and 0.5), and on the host on the saved baseline files (`--tracks`); results in `docs/case-study-straddles.md` |
+| `replay.secondbox` (second boxes: per-detection labels, enters by vehicle, the steps) and `dump_detections.py --iou` | tested; run in the edge image on MVI_40714 and MTID, every step (`--dets`, both clips dumped again at NMS IoU 0.7 and 0.5), and on the host on the saved baseline files (`--tracks`); run the same way on a second and a third UA-DETRAC clip, MVI_40855 and MVI_40863; results in `docs/case-study-straddles.md` |
 | Opt-in second-box filter in the edge (`CONTAIN_SHARE=0.9` with `CONTAIN_SAME_CLASS=1` is contain090_same, before ByteTrack; off by default) | tested on the host (`harness/tests/test_edge.py`); checked live on two clips, off, on, off on one image, every run valid: on MTID (a) to (c) pass; on MVI_40714 (a) to (d) pass, the on run logging fewer enters than both off runs, by more than they differed (`docs/case-study-straddles.md`, In the live service (opt-in)); its effect on enters measured in the replay harness |
 
 ## Case studies
@@ -33,19 +33,18 @@ kind has a follow-up study of its own (task C, closed):
 | Counting accuracy | Why do zone visit counts drift when the detector looks right frame by frame? | done: `docs/case-study-tracking.md` |
 | Event delivery over a bad uplink | Does every event arrive exactly once through low bandwidth, latency, outages and broker restarts? | done: `docs/case-study-delivery.md` |
 | Phantom boxes | Lane markings scored as vehicles, and boxes in the gap between vehicles side by side: do they get counted? | done: `docs/case-study-phantoms.md`; the second kind is measured in `docs/case-study-straddles.md` |
-| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | done: `docs/case-study-straddles.md`; straddles are a measured negative on the clip, the fix moved to second boxes, and by a rule declared in advance contain090_same wins, in the replay harness only (task C, closed); opt-in in the edge since 2026-10-05, checked live on MTID and on MVI_40714, where the on run logged fewer enters than both off runs, by more than they differed |
+| Boxes straddling two vehicles (phantom boxes, second kind) | How often is a box across two side-by-side vehicles counted, measured against annotated boxes and visits? | done: `docs/case-study-straddles.md`; straddles are a measured negative on the clip, the fix moved to second boxes, and by a rule declared in advance contain090_same wins, in the replay harness only (task C, closed); opt-in in the edge since 2026-10-05, checked live on MTID and on MVI_40714, where the on run logged fewer enters than both off runs, by more than they differed; on a third clip, MVI_40863, chosen for its baseline's second-box enters, nms050 wins by that clip's own rule, in the replay harness only |
 | Zone enter/exit balance | Do enters and exits reconcile per zone, and what does a standing imbalance reveal? | done: `docs/case-study-balance.md` |
 
 ## Task queue, in order
 
-Empty. Task C closed on 2026-10-05 on the replay result (Done 14 and 15); what was not taken is in Deferred.
+Empty. Task C closed on 2026-10-05 on the replay result (Done 14 and 15) and its third clip on 2026-10-06 (Done 19);
+what was not taken is in Deferred.
 
 ### Deferred
 Not needed for the four case studies; kept in case a benchmark angle is wanted later.
 - boxmot adapter: `pip install boxmot`, fix `update()` columns, add `boxmot_bytetrack` and `boxmot_ocsort` rows.
 - Published tracker (FastTracker or UCMCTrack) through `replay.motformat` and `scripts/trackeval_run.py`.
-- The second-box steps on a third annotated clip: MVI_40855 turned out to have no second-box enter at its baseline
-  (`docs/case-study-straddles.md`, On a second clip), so the fix's effect on enters still rests on one clip.
 - The candidate straddle fix (drop a box mostly covered by two higher-scoring boxes, keeping a car seen in
   the gap between two nearer ones): no enter on MVI_40714 sits on a box across two separate vehicles, so
   it has nothing to score there; track 451 on the expressway clip shows a straddle with fewer than two
@@ -97,6 +96,14 @@ Not needed for the four case studies; kept in case a benchmark angle is wanted l
 18. `real-after.gif` shows the zone rule act: a track it holds back is drawn grey, tagged "#ID held", from the read-only
     `DebouncedZoneCounter.held()` (`trackviz`; the services do not call it); headers' totals unchanged, `real-compare.gif`
     byte-identical.
+19. The second-box steps on a third clip (task C), after the second clip, MVI_40855, whose baseline had no second-box
+    enter (`docs/case-study-straddles.md`, On a second clip): declared and committed before any candidate was fetched,
+    the 32 test sequences in the pool ranked by bus vehicle-frames from their XMLs alone, and the three candidates'
+    zones committed before any mp4 was fetched or detection dumped. Candidate 1, UA-DETRAC MVI_40863 (metrics only), met
+    the bar with 5 counted second-box enters at its baseline, all part enters; the other two mp4s were not fetched. By
+    the clip's own rule nms050 wins, measured in the replay harness only; contain080_same, contain090_same and nms050
+    qualify, each a fix for 1 second-box enter there, and the other four steps lose found vehicles.
+    `docs/case-study-straddles.md`, Results on the third clip.
 
 ## Known rough edges
 - The edge and the sim publish each debounced enter together with its exit, so the event sum on the dashboard (now
