@@ -87,5 +87,24 @@ for n in (1, 545, 1090):
 cd ../../harness && python scripts/detrac_to_gt.py --xml ../media/UA-DETRAC/MVI_40855.xml --out runs/MVI_40855
 ```
 
+For the third clip's ranking (docs/case-study-straddles.md, On a third clip), the XMLs of its candidate pool were
+fetched from the same XML mirror into `media/UA-DETRAC/test-xml/` with no mp4 (logged in `media/SOURCES.md`).
+MVI_40714.xml and MVI_40855.xml were fetched again from it into `media/UA-DETRAC/mirror-check/` and unzipped; the `cmp`
+loop prints nothing, so both are byte-identical to the copies above and the mirror is the one already logged. From the
+repo root:
+
+```bash
+mkdir -p media/UA-DETRAC/mirror-check
+for n in MVI_40714 MVI_40855; do
+  kaggle datasets download sudharsannv/detrac-xml -f DETRAC-Test-Annotations-XML/DETRAC-Test-Annotations-XML/$n.xml \
+    -p media/UA-DETRAC/mirror-check -q
+done
+python3 -c "
+import pathlib, zipfile
+for z in sorted(pathlib.Path('media/UA-DETRAC/mirror-check').glob('*.zip')):
+    zipfile.ZipFile(z).extractall(z.parent); z.unlink()"
+for n in MVI_40714 MVI_40855; do cmp media/UA-DETRAC/mirror-check/$n.xml media/UA-DETRAC/$n.xml; done
+```
+
 Citation: Wen et al., "UA-DETRAC: A New Benchmark and Protocol for Multi-Object Detection and Tracking",
 Computer Vision and Image Understanding, 2020.
