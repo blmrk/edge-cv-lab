@@ -106,5 +106,9 @@ for z in sorted(pathlib.Path('media/UA-DETRAC/mirror-check').glob('*.zip')):
 for n in MVI_40714 MVI_40855; do cmp media/UA-DETRAC/mirror-check/$n.xml media/UA-DETRAC/$n.xml; done
 ```
 
+The third clip's candidate 1, MVI_40863 (logged in `media/SOURCES.md`), was fetched from the same video mirror and
+checked the same way by docs/case-study-straddles.md's Reproduce block: 1670 frames at 25 fps, and img00001, img00835
+and img01670 (kept in `check-40863/`) match decoded frames 0, 834 and 1669 best.
+
 Citation: Wen et al., "UA-DETRAC: A New Benchmark and Protocol for Multi-Object Detection and Tracking",
 Computer Vision and Image Understanding, 2020.
