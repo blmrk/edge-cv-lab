@@ -1,6 +1,6 @@
 # Handover
 
-Last updated 2026-10-05. Everything below has been run unless marked otherwise.
+Last updated 2026-10-06. Everything below has been run unless marked otherwise.
 
 ## Status
 
@@ -16,7 +16,7 @@ Last updated 2026-10-05. Everything below has been run unless marked otherwise.
 | Management ports (EMQX 18083, Toxiproxy 8474, Postgres 5432, Grafana) | published on `127.0.0.1` by default, `LAB_BIND=0.0.0.0` for every interface; EMQX dashboard password from `EMQX_DASHBOARD_PASSWORD` (default `public`, read on first boot only); CI token `contents: read`; `.env.*` gitignored. Checked 2026-10-05 on a sim lab: compose render, `docker port`, a LAN-address probe refused, `make counts` and `chaos/scenarios.sh reset` working (SECURITY.md) |
 | Delivery drills (`make drill`, `make broker-restart`) and their before runs (`SIM_QOS=0`, `DURABLE_SESSIONS=false`) | run on fresh labs; figures in `docs/case-study-delivery.md` |
 | Video profile (MediaMTX + YOLO edge) | runs the MTID clip by default, or any clip under `media/` with its zone (`VIDEO`, `ZONE_POLYGON`, `RTSP_BIND` on the `make up-video` line); class-agnostic NMS; or a real RTSP camera with `make up-camera` (`CAMERA_URL`: MediaMTX pulls it as `cam1` over TCP, the clip camera is not started and `make up-camera` removes one left running by `make up-video`; `docker-compose.camera.yml`), **not run against a real camera**: checked by compose render and a MediaMTX-only start that configured `cam1` from it |
-| Edge image weights and `ultralytics` runtime | the build checks `yolov8n.pt` against a pinned sha256; `YOLO_OFFLINE=1`, `YOLO_AUTOINSTALL=false`, `ULTRALYTICS_SAFE_LOAD=1`. Checked 2026-10-05: one changed hash digit fails the build, a command-running checkpoint is refused, and a `sample.mp4` detection dump in the rebuilt image is byte-identical to `runs/dets.agnostic.jsonl` (`cmp`; SECURITY.md) |
+| Edge image weights and `ultralytics` runtime | the build checks `yolov8n.pt` against a pinned sha256; `YOLO_OFFLINE=1`, `YOLO_AUTOINSTALL=false`, `ULTRALYTICS_SAFE_LOAD=1`. Checked 2026-10-05: one changed hash digit fails the build, a command-running checkpoint is refused, a `sample.mp4` detection dump in the rebuilt image is byte-identical to `runs/dets.agnostic.jsonl`, and on 2026-10-06 its ByteTrack dump (`model.track()`, the edge's default path) was byte-identical to `runs/bytetrack.agnostic.jsonl` in the rebuilt image and in the image before it (`cmp`; SECURITY.md) |
 | `tools/label.html` | used to draw the zone on the MTID clip; its visit-labelling flow is **untested on real footage** (visits came from contact-sheet passes and the MTID annotations) |
 | `scripts/detrac_to_gt.py` | parses a real UA-DETRAC file (test sequence MVI_40714, `docs/datasets.md`); its `--zone` visit truth run on it for task C (27 visits, `docs/case-study-straddles.md`) |
 | `replay.straddle` (straddles against annotated boxes) | run on MVI_40714 for the task C baseline (`docs/case-study-straddles.md`) |
