@@ -219,6 +219,12 @@ OpenCV build loads, and Debian's `ffmpeg` with GPL-2.0-or-later and GPL-3 librar
 distributed. The case studies under `docs/` and the research datasets behind some of their figures are non-commercial,
 and the lab is not hardened: [SECURITY.md](SECURITY.md) lists the defaults to replace before any deployment.
 
+## Provenance
+
+An independent personal project, written from scratch. Every figure comes from public datasets used under their own
+licences ([docs/datasets.md](docs/datasets.md)) or from synthetic fixtures the harness generates. Not affiliated with or
+endorsed by any company.
+
 ## Licence
 
 Code: [Apache License 2.0](LICENSE). Keep the `LICENSE` and [`NOTICE`](NOTICE) files with any copy or derivative, and
