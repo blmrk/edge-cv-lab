@@ -90,7 +90,7 @@ def by_frame(boxes: list[TrackBox]) -> Iterator[tuple[int, list[TrackBox]]]:
 #   The next car then emerges from behind the pillar and stops where the first one was.
 #
 # An IoU tracker leaves the first car's track parked at the window, and the second car inherits
-# that ID: two customers become one long visit.
+# that ID: two cars become one long visit.
 QUEUE_FPS = 10
 PILLAR = (440, 560)   # x-range with no detections
 WINDOW_X = 600

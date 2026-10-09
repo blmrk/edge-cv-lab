@@ -33,7 +33,7 @@ The same zone logic module runs in both, so what passes offline is what ships to
 
 ![tracker comparison](docs/img/trackers.gif)
 
-Same detections, three trackers. The middle one hands each new car the previous car's ID, so six customers become one visit with a dwell timer that never resets. Details in [docs/trackers.md](docs/trackers.md).
+Same detections, three trackers. The middle one hands each new car the previous car's ID, so six cars become one visit with a dwell timer that never resets. Details in [docs/trackers.md](docs/trackers.md).
 
 ## How the hardware is simulated
 

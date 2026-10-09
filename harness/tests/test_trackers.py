@@ -35,7 +35,7 @@ def test_registry_lists_builtins():
 def test_iou_tracker_hands_identity_to_the_next_car():
     tracks = run_tracker(create("greedy_iou"), DETS)
     assert identity_report(GT, tracks)["id_transfers"] >= 3
-    assert visits(tracks)["missed_visits"] >= 3          # separate customers merged into one visit
+    assert visits(tracks)["missed_visits"] >= 3          # separate cars merged into one visit
 
 
 def test_short_buffer_trades_handover_for_fragmentation():

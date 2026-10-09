@@ -25,7 +25,7 @@ Last updated 2026-10-06. Everything below has been run unless marked otherwise.
 
 ## Case studies
 
-The repo's story is four field failures, each written up as its own case study under `docs/`; the phantom boxes' second
+The repo's story is four common failure modes, each written up as its own case study under `docs/`; the phantom boxes' second
 kind has a follow-up study of its own (task C, closed):
 
 | Case study | Question | State |
