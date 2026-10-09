@@ -2,7 +2,18 @@
 
 **A virtual edge computer-vision lab: reproduce and fix real-world video analytics failures with no cameras, no edge boxes and no GPU.**
 
-Video analytics systems (drive-thru timing, traffic counting, footfall) tend to fail in the same few ways: objects get counted many times when they idle on a zone boundary, shadows drag boxes into the wrong lane, and events vanish when the uplink drops. These are usually debugged on site, on real hardware, slowly.
+Video analytics systems (queue and dwell timing, traffic counting, footfall) tend to fail in the same few ways: objects get counted many times when they idle on a zone boundary, shadows drag boxes into the wrong lane, and events vanish when the uplink drops. These are usually debugged on site, on real hardware, slowly.
+
+## Results
+
+| Failure | Before | After | Study |
+|---|---|---|---|
+| Car idling on a zone boundary, ±6 px jitter (synthetic, truth: 1 visit) | naive counter: **66** enters | debounced state machine: **1** | [counting](docs/case-study-tracking.md) |
+| Lane markings detected as cars (real intersection clip, 14 visits) | ByteTrack visit F1 **0.528** | 30 px zone rule: F1 **0.8** | [phantoms](docs/case-study-phantoms.md) |
+| Car box and truck box on one vehicle (per-class NMS) | **110** ID switches | class-agnostic NMS: **11** | [counting](docs/case-study-tracking.md) |
+| 64 kbps uplink, 400 ms latency, 2 min outage (1388 events) | QoS 0: **462** lost | QoS 1: all **1388** exactly once | [delivery](docs/case-study-delivery.md) |
+
+Every figure comes from a command in its case study, on checked-in fixtures or public CC-BY footage. Counts that people act on are only as good as the steps after the detector: tracking, zone logic and delivery. Each is measured here.
 
 This repo shows they can be reproduced, measured and fixed on a laptop:
 
